@@ -3,8 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, request
 
+from demo import render_demo_page
 from .cache_service import CacheService
 from .config import Settings
 from .llm_client import LLMClient
@@ -47,7 +48,7 @@ def create_app(config_override: dict[str, Any] | None = None) -> Flask:
 
     @app.get("/")
     def index() -> str:
-        return render_template("index.html", llm_enabled=writer_service.llm_client.enabled)
+        return render_demo_page(llm_enabled=writer_service.llm_client.enabled)
 
     @app.get("/api/health")
     def health():
@@ -102,4 +103,3 @@ def create_app(config_override: dict[str, Any] | None = None) -> Flask:
         return jsonify({"success": True, "data": task})
 
     return app
-

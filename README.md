@@ -98,8 +98,11 @@ GEO 模式参考了 [site-geo](https://github.com/daogeshifu/site-geo) 的 AI-re
 
 ```text
 .
-├── demo.py                     # Flask 启动入口
+├── demo.py                     # 单文件 demo console 页面
+├── app
+│   └── main.py                 # Flask app 启动入口
 ├── requirements.txt
+├── start.sh                    # 启动脚本
 ├── seo_geo_writer
 │   ├── web.py                  # Web 页面 + API 路由
 │   ├── task_service.py         # 异步任务管理
@@ -151,13 +154,27 @@ cp .env.example .env
 ### 5. Run
 
 ```bash
-python demo.py
+./start.sh
+```
+
+默认会：
+
+- 自动创建并激活 `.venv`
+- 自动安装依赖
+- 自动加载 `.env`
+- 检查目标端口占用
+- 若端口冲突则自动切到下一个可用端口
+
+后台模式：
+
+```bash
+IS_PROD=Y ./start.sh
 ```
 
 Open:
 
 ```text
-http://127.0.0.1:5000
+http://127.0.0.1:8028
 ```
 
 ---
@@ -166,8 +183,8 @@ http://127.0.0.1:5000
 
 | Name | Default | Description |
 |---|---|---|
-| `FLASK_HOST` | `127.0.0.1` | Flask host |
-| `FLASK_PORT` | `5000` | Flask port |
+| `FLASK_HOST` | `0.0.0.0` | Flask host |
+| `FLASK_PORT` | `8028` | Flask port |
 | `FLASK_DEBUG` | `true` | Debug mode |
 | `APP_DATA_DIR` | `./data` | Data directory |
 | `MAX_WORKERS` | `2` | Async worker count |
@@ -176,6 +193,8 @@ http://127.0.0.1:5000
 | `OPENAI_BASE_URL` | `https://api.openai.com/v1` | API base URL |
 | `OPENAI_MODEL` | `gpt-4.1-mini` | Model name |
 | `OPENAI_REQUEST_TIMEOUT` | `90` | Request timeout |
+| `IS_PROD` | `N` | Start in background when set to `Y` |
+| `AUTO_KILL_PORT` | `N` | Kill the requested port instead of auto-switching |
 
 If you keep `LLM_MOCK_MODE=true`, the whole workflow still works for demo and development.
 
@@ -279,7 +298,7 @@ cache_key = sha256(category + normalized_keyword + normalized_info)
 
 ## Web Demo
 
-项目内置了一个简单但适合演示的页面，支持：
+项目内置了一个更接近 `site-geo` 风格的单文件 console 页面，核心在 `demo.py`，支持：
 
 - 选择 `SEO / GEO`
 - 输入多关键词
@@ -288,6 +307,7 @@ cache_key = sha256(category + normalized_keyword + normalized_info)
 - 轮询任务状态
 - 查看缓存命中情况
 - 预览最终 HTML
+- 直接查看 API 调用示例和启动命令
 
 ---
 

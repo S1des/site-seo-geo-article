@@ -1,0 +1,29 @@
+ * Serving Flask app 'app.main'
+ * Debug mode: on
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+[33mPress CTRL+C to quit[0m
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 638-601-325
+127.0.0.1 - - [03/Apr/2026 10:44:42] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [03/Apr/2026 10:45:18] "POST /api/tasks HTTP/1.1" 200 -
+127.0.0.1 - - [03/Apr/2026 10:45:18] "GET /api/tasks/4e12ab065d0f4e23a81d3f815e0635e6 HTTP/1.1" 200 -
+127.0.0.1 - - [03/Apr/2026 10:45:20] "GET /api/tasks/4e12ab065d0f4e23a81d3f815e0635e6 HTTP/1.1" 200 -
+127.0.0.1 - - [03/Apr/2026 10:45:21] "POST /api/tasks HTTP/1.1" 200 -
+127.0.0.1 - - [03/Apr/2026 10:45:21] "GET /api/tasks/5ab0b7c7b2a14c55a795011bebc3c78e HTTP/1.1" 200 -
+ * Detected change in '/Users/berry-zhang/workspace/site-seo-geo-article/demo.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 638-601-325
+127.0.0.1 - - [03/Apr/2026 10:47:03] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [03/Apr/2026 10:48:19] "GET / HTTP/1.1" 200 -
+ * Detected change in '/Users/berry-zhang/workspace/site-seo-geo-article/demo.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 638-601-325
+127.0.0.1 - - [03/Apr/2026 10:48:21] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [03/Apr/2026 10:48:21] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+127.0.0.1 - - [03/Apr/2026 10:48:53] "POST /api/tasks HTTP/1.1" 200 -
+127.0.0.1 - - [03/Apr/2026 10:48:53] "GET /api/tasks/650f901a438243a6955a78507938bebf HTTP/1.1" 200 -
+127.0.0.1 - - [03/Apr/2026 10:48:54] "GET /api/tasks/650f901a438243a6955a78507938bebf HTTP/1.1" 200 -
