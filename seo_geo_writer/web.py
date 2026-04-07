@@ -74,7 +74,7 @@ def create_app(config_override: dict[str, Any] | None = None) -> Flask:
 
     @app.get("/generated/<asset_namespace>/<path:filename>")
     def serve_generated_asset(asset_namespace: str, filename: str):
-        directory = settings.image_dir / asset_namespace
+        directory = (settings.image_dir / asset_namespace).resolve()
         return send_from_directory(directory, filename)
 
     @app.post("/api/tasks")
