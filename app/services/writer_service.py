@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from .image_service import ImageService
-from .llm_client import LLMClient
-from .prompt_builder import (
+from app.services.image_service import ImageService
+from app.services.llm_client import LLMClient
+from app.services.prompt_builder import (
     build_draft_prompt,
     build_polish_prompt,
     build_strategy_prompt,
 )
-from .utils import extract_json_object, slugify, truncate
+from app.utils.common import extract_json_object, slugify, truncate
 
 
 class WriterService:
@@ -221,54 +221,58 @@ class WriterService:
                 ],
                 "claim_blocks": [
                     {
-                        "claim": f"{keyword} needs an answer-first article format.",
-                        "proof_hint": "Use product specs, policy pages, benchmarks, or expert docs.",
-                        "citation_hint": "Prefer official documentation or first-party evidence.",
+                        "claim": f"A high-quality {keyword} answer should be visible in the opening section.",
+                        "proof_hint": "Use concrete product or category evidence",
+                        "citation_hint": "Reference benchmark studies, documentation, or policy pages",
                     }
                 ],
                 "faq_questions": [
-                    f"What makes a {keyword} page easy for AI systems to quote?",
-                    f"How should references be added to a {keyword} article?",
-                    "What trust signals should appear on the page?",
+                    f"What is the fastest answer to {keyword}?",
+                    f"How should {keyword} be cited in AI search results?",
+                    "What proof makes the article more trustworthy?",
                 ],
                 "reference_plan": [
-                    "Official documentation",
-                    "Product specification sheet",
-                    "Support knowledge base",
+                    "Manufacturer specifications, docs, or official product pages",
+                    "Policy pages, benchmark reports, or research-backed explainers",
                 ],
-                "schema_suggestions": ["Article", "FAQPage", "Organization"],
+                "schema_suggestions": ["Article", "FAQPage"],
                 "trust_signals": ["author byline", "publish date", "last updated", "references", "TL;DR"],
+                "image_briefs": [
+                    f"Editorial hero image for {keyword}",
+                    "Visual showing proof blocks and evidence structure",
+                ],
             }
             html = f"""
 <h1>{strategy["h1_options"][0]}</h1>
-<p><strong>TL;DR:</strong> The best {keyword} page gives the answer early, backs it with proof, and makes the entity behind the answer easy to verify. That structure is what helps AI systems quote, summarize, and trust the page instead of treating it like generic marketing copy.</p>
+<p><strong>TL;DR:</strong> The strongest answer to {keyword} should appear immediately, followed by concise proof, entity clarity, and visible evidence cues that make the page easier for AI systems to cite and summarize.</p>
 <h2>The direct answer to {keyword}</h2>
-<p>If you want a page to perform in GEO scenarios, the first screen should resolve the user question directly. The article should not hide the main answer behind a long setup. Instead, it should move quickly from answer to proof.</p>
-<p>This is especially important when a reader may encounter your content through AI summaries rather than through a traditional ten-blue-links search flow.</p>
+<p>If the page is meant to perform in AI-driven discovery, the introduction should answer the core question first. Readers and systems alike should understand the conclusion without needing to scroll through a long setup section.</p>
+<p>That opening answer should stay consistent with the rest of the page. If brand or product claims appear later, they should reinforce the same entity story instead of introducing a new angle halfway through the article.</p>
 <h2>Proof points and entity context</h2>
-<p>Every important claim should point to a proof source, a measurable detail, or a clearly attributable internal fact. Strong GEO pages are easier to cite because their statements are easier to verify.</p>
+<p>Strong GEO content is not just concise. It is also grounded. Add clear evidence types such as specs, benchmark data, official documentation, product details, or policy references whenever they strengthen a factual claim.</p>
+<p><strong>Entity context:</strong> {brand_line}</p>
 <ul>
-  <li><strong>Entity summary:</strong> {brand_line}</li>
-  <li><strong>Proof block:</strong> add benchmarks, specs, policy references, or support documentation.</li>
-  <li><strong>Trust signals:</strong> include author, publish date, and last updated information.</li>
+  <li><strong>Answer-first:</strong> help systems extract the main takeaway quickly.</li>
+  <li><strong>Proof blocks:</strong> pair claims with evidence hints and source categories.</li>
+  <li><strong>Entity clarity:</strong> keep product names, descriptors, and positioning consistent.</li>
 </ul>
 <h2>References and citation plan</h2>
-<p>Do not rely on vague authority language. A GEO-ready page should expose where the information comes from, what type of source supports it, and which statements deserve inline citations.</p>
-<p>Recommended reference types for this draft include official documentation, product specification sheets, knowledge-base articles, third-party benchmarks, and expert commentary when appropriate.</p>
+<p>Instead of inventing links, define the reference categories the final article should cite. Official product documentation, trusted third-party benchmarks, regulatory pages, and policy explainers are usually stronger than generic blog commentary.</p>
+<p>This is also where inline citations, quote-ready facts, and clearly labeled updates can improve extraction quality.</p>
 <h2>Update log</h2>
-<p>Add a visible update note whenever product specs, policies, or feature details change. Freshness helps both human readers and machine systems understand whether the page is still safe to quote.</p>
+<p>Add visible freshness signals when the article is published. A publish date, a last-updated date, and a short note describing what changed can make the page easier to trust.</p>
 <h2>Conclusion</h2>
-<p>{keyword} content works better in GEO when it feels answerable, attributable, and trustworthy. Before publishing, replace the placeholders in this draft with real evidence, descriptive internal links, and consistent brand entity data.</p>
+<p>{keyword} pages work best when they are direct, evidence-backed, and consistent about the entities they discuss. Use this draft as the structure, then replace the placeholder proof guidance with verified citations before publishing.</p>
 <h2>FAQ</h2>
-<h3>What makes a {keyword} page easy for AI systems to quote?</h3>
-<p>Direct answers, structured headings, proof-based claims, and visible references make extraction easier.</p>
-<h3>How should references be added to a {keyword} article?</h3>
-<p>Use a references section plus inline citation cues around factual claims, comparisons, and statistics.</p>
-<h3>What trust signals should appear on the page?</h3>
-<p>At minimum, show the author, publish or update date, entity context, and the source type behind important claims.</p>
+<h3>What is the fastest answer to {keyword}?</h3>
+<p>Give the short answer in the first screen, then expand with evidence and context.</p>
+<h3>How should {keyword} be cited in AI search results?</h3>
+<p>Use clear headings, compact paragraphs, and evidence-backed statements that can be quoted easily.</p>
+<h3>What proof makes the article more trustworthy?</h3>
+<p>Official specs, policy pages, benchmark data, and consistent entity descriptions usually help most.</p>
 """.strip()
 
-        return self._package_article(
+        article = self._package_article(
             category=category,
             keyword=keyword,
             info=info,
@@ -277,6 +281,7 @@ class WriterService:
             html=html,
             generation_mode="mock",
         )
+        return article
 
     def _attach_images(
         self,
@@ -288,35 +293,29 @@ class WriterService:
         info: str,
         generate_images: bool,
     ) -> dict[str, Any]:
-        article_copy = dict(article)
         if not generate_images or not self.image_service:
-            article_copy.setdefault("images", [])
-            article_copy.setdefault("cover_image", None)
-            article_copy.setdefault("content_images", [])
-            article_copy.setdefault("image_generation_mode", "disabled")
-            return article_copy
+            article["images"] = article.get("images") or []
+            article["cover_image"] = article.get("cover_image")
+            article["content_images"] = article.get("content_images") or []
+            article["image_generation_mode"] = "disabled"
+            return article
 
-        if article_copy.get("images"):
-            article_copy["cover_image"] = next(
-                (item for item in article_copy["images"] if item.get("role") == "cover"),
-                article_copy.get("cover_image"),
-            )
-            article_copy["content_images"] = [
-                item for item in article_copy["images"] if item.get("role") == "content"
-            ]
-            article_copy["image_generation_mode"] = article_copy.get("image_generation_mode") or self.image_service.mode
-            return article_copy
+        if article.get("images"):
+            article["cover_image"] = next((item for item in article["images"] if item["role"] == "cover"), None)
+            article["content_images"] = [item for item in article["images"] if item["role"] == "content"]
+            article["image_generation_mode"] = article.get("image_generation_mode") or self.image_service.mode
+            return article
 
         assets = self.image_service.generate_for_article(
             asset_namespace=asset_namespace,
             category=category,
             keyword=keyword,
             info=info,
-            article=article_copy,
+            article=article,
         )
-        article_copy["images"] = assets
-        article_copy["cover_image"] = next((item for item in assets if item.get("role") == "cover"), None)
-        article_copy["content_images"] = [item for item in assets if item.get("role") == "content"]
-        article_copy["image_generation_mode"] = self.image_service.mode
-        article_copy["html"] = self.image_service.inject_images_into_html(article_copy["html"], assets)
-        return article_copy
+        article["images"] = assets
+        article["cover_image"] = next((item for item in assets if item["role"] == "cover"), None)
+        article["content_images"] = [item for item in assets if item["role"] == "content"]
+        article["image_generation_mode"] = self.image_service.mode
+        article["html"] = self.image_service.inject_images_into_html(article["html"], assets)
+        return article

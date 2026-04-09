@@ -7,7 +7,7 @@
 从关键词和品牌信息出发，自动生成更适合搜索引擎与 AI 引用场景的文章草稿。
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://python.org)
-[![Flask](https://img.shields.io/badge/Flask-3.x-black?logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 [Live Preview](https://www.idtcpack.com/) · [Quick Start](#quick-start) · [API](#api) · [Roadmap](#roadmap)
@@ -102,25 +102,31 @@ GEO 模式参考了 [site-geo](https://github.com/daogeshifu/site-geo) 的 AI-re
 
 ```text
 .
-├── demo.py                     # 单文件 demo console 页面
 ├── app
-│   └── main.py                 # Flask app 启动入口
+│   ├── api
+│   │   ├── routes.py           # API 路由
+│   │   └── schemas.py          # API schema
+│   ├── core
+│   │   ├── config.py           # 配置
+│   │   ├── factory.py          # FastAPI app 组装
+│   │   └── runtime.py          # 共享服务初始化
+│   ├── services
+│   │   ├── image_service.py    # 图片服务
+│   │   ├── prompt_builder.py   # Prompt 服务
+│   │   ├── writer_service.py   # 写作编排
+│   │   ├── task_service.py     # 异步任务服务
+│   │   ├── cache_service.py    # 缓存服务
+│   │   └── llm_client.py       # LLM 客户端
+│   ├── utils
+│   │   └── common.py           # 通用工具
+│   ├── web
+│   │   ├── routes.py           # Demo 页面路由
+│   │   ├── context.py          # Demo 页面上下文
+│   │   ├── templates/demo/index.html
+│   │   └── static/demo/*
+│   └── main.py                 # FastAPI app 启动入口
 ├── requirements.txt
 ├── start.sh                    # 启动脚本
-├── seo_geo_writer
-│   ├── web.py                  # Web 页面 + API 路由
-│   ├── task_service.py         # 异步任务管理
-│   ├── cache_service.py        # category + keyword + info 缓存
-│   ├── image_service.py        # Azure / mock 图片生成
-│   ├── writer_service.py       # SEO / GEO 写作总流程
-│   ├── prompt_builder.py       # 两套 prompt 逻辑
-│   ├── llm_client.py           # OpenAI-compatible client
-│   ├── config.py               # 配置
-│   └── utils.py                # 通用工具
-├── templates
-│   └── index.html              # Demo 页面
-├── static
-│   └── style.css               # Demo 样式
 └── tests
     ├── test_api.py
     └── test_cache_service.py
@@ -320,7 +326,7 @@ cache_key = sha256(category + normalized_keyword + normalized_info)
 
 ## Web Demo
 
-项目内置了一个更接近 `site-geo` 风格的单文件 console 页面，核心在 `demo.py`，支持：
+项目内置了一个更接近 `site-geo` 风格的 FastAPI 模板 console 页面，由 `app/web/templates/` + `app/web/static/` 资源驱动，支持：
 
 - 选择 `SEO / GEO`
 - 输入多关键词

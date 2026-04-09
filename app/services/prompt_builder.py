@@ -183,4 +183,3 @@ def build_polish_prompt(category: str, language: str, keyword: str, html: str) -
         {html}
         """
     ).strip()
-

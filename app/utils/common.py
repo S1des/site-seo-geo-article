@@ -80,4 +80,3 @@ def extract_json_object(raw: str) -> dict[str, Any]:
         raise ValueError("No JSON object found in model response.")
     snippet = text[start : end + 1]
     return json.loads(snippet)
-

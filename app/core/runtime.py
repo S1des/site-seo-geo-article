@@ -1,0 +1,54 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+from fastapi.templating import Jinja2Templates
+
+from app.core.config import Settings
+from app.services.cache_service import CacheService
+from app.services.image_service import ImageService
+from app.services.llm_client import LLMClient
+from app.services.task_service import TaskService
+from app.services.writer_service import WriterService
+
+
+@dataclass
+class AppServices:
+    settings: Settings
+    cache_service: CacheService
+    image_service: ImageService
+    writer_service: WriterService
+    task_service: TaskService
+    templates: Jinja2Templates
+
+
+def build_services(config_override: dict[str, Any] | None = None) -> AppServices:
+    app_root = Path(__file__).resolve().parent.parent
+    settings = Settings.from_env()
+    if config_override:
+        for key, value in config_override.items():
+            setattr(settings, key, value)
+        settings.cache_dir = settings.data_dir / "cache"
+        settings.tasks_dir = settings.data_dir / "tasks"
+        settings.image_dir = settings.data_dir / "images"
+
+    cache_service = CacheService(settings.cache_dir)
+    image_service = ImageService(settings)
+    writer_service = WriterService(LLMClient(settings), image_service=image_service)
+    task_service = TaskService(
+        writer_service=writer_service,
+        cache_service=cache_service,
+        tasks_dir=settings.tasks_dir,
+        max_workers=settings.max_workers,
+    )
+
+    return AppServices(
+        settings=settings,
+        cache_service=cache_service,
+        image_service=image_service,
+        writer_service=writer_service,
+        task_service=task_service,
+        templates=Jinja2Templates(directory=str(app_root / "web" / "templates")),
+    )

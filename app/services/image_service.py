@@ -7,8 +7,8 @@ from typing import Any
 
 import requests
 
-from .config import Settings
-from .utils import ensure_dir, slugify
+from app.core.config import Settings
+from app.utils.common import ensure_dir, slugify
 
 
 class ImageService:
@@ -238,11 +238,11 @@ class ImageService:
   <circle cx="{220 + index * 48}" cy="180" r="120" fill="rgba(255,255,255,0.10)" />
   <circle cx="1290" cy="820" r="160" fill="rgba(255,255,255,0.08)" />
   <rect x="96" y="96" width="1344" height="832" rx="40" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.16)" />
-  <text x="128" y="220" fill="#e2e8f0" font-size="40" font-family="Inter, Arial, sans-serif" font-weight="700">{safe_lines[0]}</text>
-  <text x="128" y="306" fill="#ffffff" font-size="74" font-family="Inter, Arial, sans-serif" font-weight="800">{safe_lines[1]}</text>
-  <text x="128" y="396" fill="#cbd5e1" font-size="46" font-family="Inter, Arial, sans-serif" font-weight="600">{safe_lines[2]}</text>
-  <foreignObject x="128" y="470" width="980" height="260">
-    <div xmlns="http://www.w3.org/1999/xhtml" style="font-family:Inter,Arial,sans-serif;font-size:28px;line-height:1.6;color:#dbeafe;">
+  <text x="136" y="210" fill="#ffffff" font-size="62" font-family="Arial, sans-serif" font-weight="700">{safe_lines[0]}</text>
+  <text x="136" y="300" fill="#bfdbfe" font-size="44" font-family="Arial, sans-serif" font-weight="700">{safe_lines[1]}</text>
+  <text x="136" y="390" fill="#e2e8f0" font-size="36" font-family="Arial, sans-serif">{safe_lines[2]}</text>
+  <foreignObject x="136" y="460" width="1160" height="320">
+    <div xmlns="http://www.w3.org/1999/xhtml" style="color:#dbeafe;font:28px Arial,sans-serif;line-height:1.45;">
       {safe_lines[3]}
     </div>
   </foreignObject>
@@ -253,13 +253,13 @@ class ImageService:
     def _generation_url(self) -> str:
         if self.settings.azure_image_api_url:
             return self.settings.azure_image_api_url
-        if not (self.settings.azure_image_endpoint and self.settings.azure_image_deployment):
-            return ""
-        return (
-            f"{self.settings.azure_image_endpoint}/openai/deployments/"
-            f"{self.settings.azure_image_deployment}/images/generations"
-            f"?api-version={self.settings.azure_image_api_version}"
-        )
+        if self.settings.azure_image_endpoint and self.settings.azure_image_deployment:
+            return (
+                f"{self.settings.azure_image_endpoint}/openai/deployments/"
+                f"{self.settings.azure_image_deployment}/images/generations"
+                f"?api-version={self.settings.azure_image_api_version}"
+            )
+        return ""
 
     def _escape_attr(self, value: str) -> str:
         return (

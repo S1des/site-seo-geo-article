@@ -1,7 +1,9 @@
 import time
 from pathlib import Path
 
-from seo_geo_writer.web import create_app
+from fastapi.testclient import TestClient
+
+from app.core.factory import create_app
 
 
 def test_create_task_and_fetch_result(tmp_path: Path) -> None:
@@ -14,7 +16,7 @@ def test_create_task_and_fetch_result(tmp_path: Path) -> None:
             "vip_access_token": "test-vip",
         }
     )
-    client = app.test_client()
+    client = TestClient(app)
 
     unauthorized_response = client.post(
         "/api/tasks",
@@ -36,8 +38,8 @@ def test_create_task_and_fetch_result(tmp_path: Path) -> None:
         },
     )
     assert create_response.status_code == 200
-    task_id = create_response.get_json()["data"]["task_id"]
-    assert create_response.get_json()["data"]["access_tier"] == "vip"
+    task_id = create_response.json()["data"]["task_id"]
+    assert create_response.json()["data"]["access_tier"] == "vip"
 
     deadline = time.time() + 5
     status = None
@@ -45,7 +47,7 @@ def test_create_task_and_fetch_result(tmp_path: Path) -> None:
     while time.time() < deadline:
         task_response = client.get(f"/api/tasks/{task_id}")
         assert task_response.status_code == 200
-        task_payload = task_response.get_json()["data"]
+        task_payload = task_response.json()["data"]
         status = task_payload["status"]
         if status in {"completed", "failed", "partial_failed"}:
             break
@@ -60,3 +62,26 @@ def test_create_task_and_fetch_result(tmp_path: Path) -> None:
     image_url = task_payload["items"][0]["article"]["images"][0]["url"]
     image_response = client.get(image_url)
     assert image_response.status_code == 200
+
+
+def test_index_renders_template_assets(tmp_path: Path) -> None:
+    app = create_app(
+        {
+            "data_dir": tmp_path,
+            "llm_mock_mode": True,
+            "openai_api_key": "",
+            "normal_access_token": "test-standard",
+            "vip_access_token": "test-vip",
+        }
+    )
+    client = TestClient(app)
+
+    response = client.get("/")
+    assert response.status_code == 200
+
+    html = response.text
+    assert "Create Task" in html
+    assert "Task Result" in html
+    assert "/static/demo/style.css" in html
+    assert "/static/demo/demo.js" in html
+    assert "/docs" in html

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from seo_geo_writer.cache_service import CacheService
+from app.services.cache_service import CacheService
 
 
 def test_cache_service_uses_same_key_for_equivalent_spacing(tmp_path: Path) -> None:
@@ -10,4 +10,3 @@ def test_cache_service_uses_same_key_for_equivalent_spacing(tmp_path: Path) -> N
     hit = cache.get("seo", "  portable   charger ", "Brand:  VoltGo")
     assert hit is not None
     assert hit["article"]["title"] == "A"
-

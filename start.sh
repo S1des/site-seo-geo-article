@@ -74,6 +74,7 @@ echo "=========================================="
 echo "  SEO / GEO Article Writer starting..."
 echo "  URL:        http://127.0.0.1:${PORT}"
 echo "  Health:     http://127.0.0.1:${PORT}/api/health"
+echo "  Docs:       http://127.0.0.1:${PORT}/docs"
 echo "  Mode:       $( [ "${DEBUG_FLAG}" = "true" ] && echo "debug" || echo "normal" )"
 echo "  LLM mode:   $( [ -n "${OPENAI_API_KEY:-}" ] && [ "${LLM_MOCK_MODE:-true}" != "true" ] && echo "live" || echo "mock" )"
 if [[ "${IS_PROD}" =~ ^[Yy]$ ]]; then
@@ -86,13 +87,13 @@ echo "=========================================="
 echo ""
 
 if [[ "${IS_PROD}" =~ ^[Yy]$ ]]; then
-  nohup python -m flask --app app.main run --host "${HOST}" --port "${PORT}" > nohup.out 2>&1 &
+  nohup python -m uvicorn app.main:app --host "${HOST}" --port "${PORT}" > nohup.out 2>&1 &
   echo $! > server.pid
   echo ">>> Server started in background, PID: $(cat server.pid)"
 else
   if [ "${DEBUG_FLAG}" = "true" ]; then
-    exec python -m flask --app app.main run --debug --host "${HOST}" --port "${PORT}"
+    exec python -m uvicorn app.main:app --reload --host "${HOST}" --port "${PORT}"
   else
-    exec python -m flask --app app.main run --host "${HOST}" --port "${PORT}"
+    exec python -m uvicorn app.main:app --host "${HOST}" --port "${PORT}"
   fi
 fi

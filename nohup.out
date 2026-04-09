@@ -1,30 +1,13 @@
- * Serving Flask app 'app.main'
- * Debug mode: on
-[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
- * Running on http://127.0.0.1:5000
-[33mPress CTRL+C to quit[0m
- * Restarting with stat
- * Debugger is active!
- * Debugger PIN: 213-021-736
-127.0.0.1 - - [08/Apr/2026 15:25:48] "GET / HTTP/1.1" 200 -
-127.0.0.1 - - [08/Apr/2026 15:25:48] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
- * Detected change in '/Users/berry-zhang/workspace/site-seo-geo-article/seo_geo_writer/config.py', reloading
- * Restarting with stat
- * Debugger is active!
- * Debugger PIN: 213-021-736
- * Detected change in '/Users/berry-zhang/workspace/site-seo-geo-article/seo_geo_writer/task_service.py', reloading
- * Restarting with stat
- * Debugger is active!
- * Debugger PIN: 213-021-736
- * Detected change in '/Users/berry-zhang/workspace/site-seo-geo-article/seo_geo_writer/web.py', reloading
- * Restarting with stat
- * Debugger is active!
- * Debugger PIN: 213-021-736
- * Detected change in '/Users/berry-zhang/workspace/site-seo-geo-article/demo.py', reloading
- * Restarting with stat
- * Debugger is active!
- * Debugger PIN: 213-021-736
- * Detected change in '/Users/berry-zhang/workspace/site-seo-geo-article/tests/test_api.py', reloading
- * Restarting with stat
- * Debugger is active!
- * Debugger PIN: 213-021-736
+INFO:     Started server process [83686]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:5000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:54007 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54008 - "GET /static/demo/demo.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54007 - "GET /static/demo/style.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54008 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:54031 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54031 - "GET /openapi.json HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54034 - "GET /api/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54181 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54181 - "GET /openapi.json HTTP/1.1" 200 OK
