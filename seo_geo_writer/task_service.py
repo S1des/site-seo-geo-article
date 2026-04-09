@@ -58,6 +58,7 @@ class TaskService:
         language: str = "English",
         force_refresh: bool = False,
         generate_images: bool = True,
+        access_tier: str = "standard",
     ) -> dict[str, Any]:
         keyword_list = split_keywords(keywords)
         if not keyword_list:
@@ -73,6 +74,7 @@ class TaskService:
             "language": language,
             "force_refresh": force_refresh,
             "generate_images": generate_images,
+            "access_tier": access_tier,
             "status": "queued",
             "created_at": now,
             "updated_at": now,

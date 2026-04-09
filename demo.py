@@ -336,6 +336,16 @@ def render_demo_page(*, llm_enabled: bool, image_enabled: bool, image_mode: str)
       cursor: pointer;
     }}
 
+    .token-note {{
+      grid-column: 1 / -1;
+      padding: 12px 14px;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.72);
+      color: var(--muted);
+      font-size: 12px;
+    }}
+
     .actions {{
       display: flex;
       align-items: center;
@@ -843,12 +853,19 @@ def render_demo_page(*, llm_enabled: bool, image_enabled: bool, image_mode: str)
         <div class="card-header">
           <div class="card-title">
             <strong>Create Task</strong>
-            <span>Submit one or more keywords and generate article drafts asynchronously.</span>
+            <span>Submit one or more keywords and generate article drafts asynchronously. A valid token is required.</span>
           </div>
           <span class="pill">Demo Console</span>
         </div>
         <div class="card-body">
           <form id="task-form" class="form-grid">
+            <label class="full">
+              Access Token
+              <input type="text" name="token" placeholder="Enter standard or VIP token from .env" required />
+            </label>
+            <div class="token-note">
+              Standard token and VIP token are both configured from `.env`. Only users with a valid token can start tasks.
+            </div>
             <label>
               Category
               <select name="category" required>
@@ -1067,6 +1084,9 @@ def render_demo_page(*, llm_enabled: bool, image_enabled: bool, image_mode: str)
 
     function renderResults(task) {{
       taskMeta.textContent = `Task ${{task.task_id}} · ${{task.status}}`;
+      if (task.access_tier) {{
+        taskMeta.textContent += ` · ${{task.access_tier}}`;
+      }}
       renderSummary(task.progress);
       apiJson.textContent = JSON.stringify(task, null, 2);
       const items = task.items || [];
@@ -1104,6 +1124,7 @@ def render_demo_page(*, llm_enabled: bool, image_enabled: bool, image_mode: str)
                   ${{item.cache_hit ? '<span class="pill pill-cache">cache hit</span>' : ''}}
                   ${{article.generation_mode ? `<span class="pill">${{escapeHtml(article.generation_mode)}}</span>` : ''}}
                   ${{article.image_generation_mode ? `<span class="pill">${{escapeHtml(article.image_generation_mode)} images</span>` : ''}}
+                  ${{task.access_tier ? `<span class="pill">${{escapeHtml(task.access_tier)} access</span>` : ''}}
                 </div>
               </div>
             </div>
@@ -1188,6 +1209,7 @@ def render_demo_page(*, llm_enabled: bool, image_enabled: bool, image_mode: str)
 
       const formData = new FormData(form);
       const payload = {{
+        token: formData.get("token"),
         category: formData.get("category"),
         language: formData.get("language"),
         keywords: formData.get("keywords"),
@@ -1212,7 +1234,7 @@ def render_demo_page(*, llm_enabled: bool, image_enabled: bool, image_mode: str)
         return;
       }}
 
-      taskMeta.textContent = `Task ${{data.data.task_id}} created`;
+      taskMeta.textContent = `Task ${{data.data.task_id}} created · ${{data.data.access_tier || 'authorized'}}`;
       apiJson.textContent = JSON.stringify(data, null, 2);
       fetchTask(data.data.task_id);
     }});

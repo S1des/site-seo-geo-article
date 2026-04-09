@@ -29,6 +29,8 @@ class Settings:
     azure_image_quality: str = "medium"
     azure_image_output_format: str = "png"
     article_content_image_count: int = 3
+    normal_access_token: str = ""
+    vip_access_token: str = ""
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -59,4 +61,6 @@ class Settings:
                 2,
                 min(3, int(os.getenv("ARTICLE_CONTENT_IMAGE_COUNT", "3"))),
             ),
+            normal_access_token=os.getenv("NORMAL_ACCESS_TOKEN", "").strip(),
+            vip_access_token=os.getenv("VIP_ACCESS_TOKEN", "").strip(),
         )

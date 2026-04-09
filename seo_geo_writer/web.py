@@ -15,6 +15,17 @@ from .utils import split_keywords
 from .writer_service import WriterService
 
 
+def resolve_access_tier(settings: Settings, token: str) -> str | None:
+    token = token.strip()
+    if not token:
+        return None
+    if settings.vip_access_token and token == settings.vip_access_token:
+        return "vip"
+    if settings.normal_access_token and token == settings.normal_access_token:
+        return "standard"
+    return None
+
+
 def create_app(config_override: dict[str, Any] | None = None) -> Flask:
     root_path = Path(__file__).resolve().parent.parent
     app = Flask(
@@ -68,6 +79,13 @@ def create_app(config_override: dict[str, Any] | None = None) -> Flask:
                     "mock_mode": not writer_service.llm_client.enabled,
                     "image_generation_enabled": image_service.enabled,
                     "image_generation_mode": image_service.mode,
+                    "token_protection_enabled": bool(
+                        settings.normal_access_token or settings.vip_access_token
+                    ),
+                    "token_tiers": {
+                        "standard": bool(settings.normal_access_token),
+                        "vip": bool(settings.vip_access_token),
+                    },
                 },
             }
         )
@@ -85,9 +103,14 @@ def create_app(config_override: dict[str, Any] | None = None) -> Flask:
         language = str(payload.get("language", "English")).strip() or "English"
         force_refresh = str(payload.get("force_refresh", "false")).lower() in {"1", "true", "yes"}
         generate_images = str(payload.get("generate_images", "true")).lower() in {"1", "true", "yes"}
+        token = str(payload.get("token", "")).strip()
+        access_tier = resolve_access_tier(settings, token)
 
         if category not in {"seo", "geo"}:
             return jsonify({"success": False, "message": "category must be seo or geo"}), 400
+
+        if not access_tier:
+            return jsonify({"success": False, "message": "valid access token is required"}), 403
 
         keywords = split_keywords(payload.get("keywords", ""))
         if not keywords:
@@ -100,6 +123,7 @@ def create_app(config_override: dict[str, Any] | None = None) -> Flask:
             language=language,
             force_refresh=force_refresh,
             generate_images=generate_images,
+            access_tier=access_tier,
         )
         return jsonify(
             {
@@ -107,6 +131,7 @@ def create_app(config_override: dict[str, Any] | None = None) -> Flask:
                 "data": {
                     "task_id": task["task_id"],
                     "status": task["status"],
+                    "access_tier": access_tier,
                 },
             }
         )

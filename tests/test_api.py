@@ -10,11 +10,13 @@ def test_create_task_and_fetch_result(tmp_path: Path) -> None:
             "data_dir": tmp_path,
             "llm_mock_mode": True,
             "openai_api_key": "",
+            "normal_access_token": "test-standard",
+            "vip_access_token": "test-vip",
         }
     )
     client = app.test_client()
 
-    create_response = client.post(
+    unauthorized_response = client.post(
         "/api/tasks",
         json={
             "category": "geo",
@@ -22,8 +24,20 @@ def test_create_task_and_fetch_result(tmp_path: Path) -> None:
             "info": "Brand: VoltGo",
         },
     )
+    assert unauthorized_response.status_code == 403
+
+    create_response = client.post(
+        "/api/tasks",
+        json={
+            "token": "test-vip",
+            "category": "geo",
+            "keywords": ["portable charger on plane"],
+            "info": "Brand: VoltGo",
+        },
+    )
     assert create_response.status_code == 200
     task_id = create_response.get_json()["data"]["task_id"]
+    assert create_response.get_json()["data"]["access_tier"] == "vip"
 
     deadline = time.time() + 5
     status = None
@@ -39,6 +53,7 @@ def test_create_task_and_fetch_result(tmp_path: Path) -> None:
 
     assert status == "completed"
     assert task_payload is not None
+    assert task_payload["access_tier"] == "vip"
     assert task_payload["items"][0]["article"]["generation_mode"] == "mock"
     assert len(task_payload["items"][0]["article"]["images"]) >= 3
 
