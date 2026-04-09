@@ -4,6 +4,7 @@ from fastapi import APIRouter, Header, status
 from fastapi.responses import JSONResponse
 
 from app.core.runtime import AppServices
+from app.services.task_service import FINAL_STATUSES
 from app.utils.common import split_keywords
 from .schemas import (
     ErrorResponse,
@@ -121,6 +122,16 @@ def create_api_router(services: AppServices) -> APIRouter:
             return JSONResponse(
                 status_code=status.HTTP_404_NOT_FOUND,
                 content={"success": False, "message": "task not found"},
+            )
+        if task.get("status") not in FINAL_STATUSES:
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={
+                    "success": False,
+                    "message": "task not completed",
+                    "status": task.get("status", "running"),
+                    "task_id": task_id,
+                },
             )
         return TaskDetailResponse(data=task)
 

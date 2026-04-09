@@ -189,6 +189,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const payload = await response.json();
 
     if (!payload.success) {
+      if (["queued", "running"].includes(payload.status)) {
+        taskMeta.textContent = `Task ${payload.task_id || taskId} · ${payload.status}`;
+        apiJson.textContent = JSON.stringify(payload, null, 2);
+        pollTimer = setTimeout(() => fetchTask(taskId), 1500);
+        return;
+      }
       taskMeta.textContent = payload.message || "Task lookup failed";
       apiJson.textContent = JSON.stringify(payload, null, 2);
       resetTaskUi(taskMeta.textContent);

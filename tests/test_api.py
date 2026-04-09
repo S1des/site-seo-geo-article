@@ -59,7 +59,11 @@ def test_create_task_and_fetch_result(tmp_path: Path) -> None:
     while time.time() < deadline:
         task_response = client.get(f"/api/tasks/{task_id}", headers=bearer)
         assert task_response.status_code == 200
-        task_payload = task_response.json()["data"]
+        body = task_response.json()
+        if body.get("success") is False and body.get("status") in {"queued", "running"}:
+            time.sleep(0.1)
+            continue
+        task_payload = body["data"]
         status = task_payload["status"]
         if status in {"completed", "failed", "partial_failed"}:
             break
@@ -108,7 +112,11 @@ def test_task_can_disable_cover_and_content_images(tmp_path: Path) -> None:
     while time.time() < deadline:
         task_response = client.get(f"/api/tasks/{task_id}", headers=bearer)
         assert task_response.status_code == 200
-        task_payload = task_response.json()["data"]
+        body = task_response.json()
+        if body.get("success") is False and body.get("status") in {"queued", "running"}:
+            time.sleep(0.1)
+            continue
+        task_payload = body["data"]
         if task_payload["status"] in {"completed", "failed", "partial_failed"}:
             break
         time.sleep(0.1)
@@ -118,6 +126,50 @@ def test_task_can_disable_cover_and_content_images(tmp_path: Path) -> None:
     assert article["cover_image"] is None
     assert article["content_images"] == []
     assert article["image_generation_mode"] == "disabled"
+
+
+def test_get_task_returns_false_while_running(tmp_path: Path) -> None:
+    app = create_app(
+        {
+            "data_dir": tmp_path,
+            "llm_mock_mode": True,
+            "openai_api_key": "",
+            "normal_access_key": "test-standard-key",
+            "vip_access_key": "test-vip-key",
+            "token_signing_secret": "test-signing-secret",
+        }
+    )
+    original_generate = app.state.services.writer_service.generate
+
+    def delayed_generate(*args, **kwargs):
+        time.sleep(0.25)
+        return original_generate(*args, **kwargs)
+
+    app.state.services.writer_service.generate = delayed_generate
+    client = TestClient(app)
+    token_data = issue_token(client)
+    bearer = {"Authorization": f"Bearer {token_data['access_token']}"}
+
+    create_response = client.post(
+        "/api/tasks",
+        headers=bearer,
+        json={
+            "category": "seo",
+            "keywords": ["best usb c charger"],
+            "info": "Brand: VoltGo",
+            "include_cover": 0,
+            "content_image_count": 0,
+        },
+    )
+    assert create_response.status_code == 200
+    task_id = create_response.json()["data"]["task_id"]
+
+    task_response = client.get(f"/api/tasks/{task_id}", headers=bearer)
+    assert task_response.status_code == 200
+    payload = task_response.json()
+    assert payload["success"] is False
+    assert payload["message"] == "task not completed"
+    assert payload["status"] in {"queued", "running"}
 
 
 def test_index_renders_token_and_task_console(tmp_path: Path) -> None:
