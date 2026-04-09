@@ -144,7 +144,7 @@ a { color: inherit; }
 
 h1 {
   margin: 0 0 14px;
-  font-size: clamp(1.85rem, 5vw, 3.35rem);
+  font-size: clamp(1.85rem, 5vw, 2.35rem);
   line-height: 1.02;
   letter-spacing: -0.04em;
   max-width: 860px;
