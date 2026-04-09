@@ -27,13 +27,14 @@ def resolve_auth_payload(services: AppServices, authorization: str | None) -> di
 
 
 def create_api_router(services: AppServices) -> APIRouter:
-    router = APIRouter(prefix="/api", tags=["api"])
+    router = APIRouter(prefix="/api")
 
     @router.post(
         "/token",
-        include_in_schema=False,
+        tags=["auth"],
         response_model=TokenExchangeResponse,
         responses={403: {"model": ErrorResponse}},
+        summary="Exchange an access key for a 1-day bearer token",
     )
     async def exchange_token(payload: TokenExchangeRequest) -> TokenExchangeResponse | JSONResponse:
         issued = services.auth_service.issue_token(payload.access_key)
@@ -46,6 +47,7 @@ def create_api_router(services: AppServices) -> APIRouter:
 
     @router.post(
         "/tasks",
+        tags=["tasks"],
         response_model=TaskCreateResponse,
         responses={400: {"model": ErrorResponse}, 401: {"model": ErrorResponse}},
         summary="Create an async article generation task",
@@ -98,6 +100,7 @@ def create_api_router(services: AppServices) -> APIRouter:
 
     @router.get(
         "/tasks/{task_id}",
+        tags=["tasks"],
         response_model=TaskDetailResponse,
         responses={401: {"model": ErrorResponse}, 404: {"model": ErrorResponse}},
         summary="Fetch an async task result",

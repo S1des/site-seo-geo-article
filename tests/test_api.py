@@ -160,4 +160,4 @@ def test_openapi_only_exposes_task_endpoints(tmp_path: Path) -> None:
     response = client.get("/openapi.json")
     assert response.status_code == 200
     paths = response.json()["paths"]
-    assert set(paths.keys()) == {"/api/tasks", "/api/tasks/{task_id}"}
+    assert set(paths.keys()) == {"/api/token", "/api/tasks", "/api/tasks/{task_id}"}
