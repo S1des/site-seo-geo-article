@@ -12,19 +12,34 @@ class CacheService:
         self.cache_dir = cache_dir
         ensure_dir(cache_dir)
 
-    def build_key(self, category: str, keyword: str, info: str, word_limit: int = 1200) -> str:
+    def build_key(
+        self,
+        category: str,
+        keyword: str,
+        info: str,
+        word_limit: int = 1200,
+        access_tier: str = "standard",
+    ) -> str:
         raw = "||".join(
             [
                 normalize_text(category),
                 normalize_text(keyword),
                 normalize_text(info),
                 str(max(200, int(word_limit))),
+                normalize_text(access_tier or "standard"),
             ]
         )
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
-    def get(self, category: str, keyword: str, info: str, word_limit: int = 1200) -> dict[str, Any] | None:
-        path = self.path_for(category, keyword, info, word_limit)
+    def get(
+        self,
+        category: str,
+        keyword: str,
+        info: str,
+        word_limit: int = 1200,
+        access_tier: str = "standard",
+    ) -> dict[str, Any] | None:
+        path = self.path_for(category, keyword, info, word_limit, access_tier)
         if not path.exists():
             return None
         return load_json(path)
@@ -36,19 +51,28 @@ class CacheService:
         info: str,
         article: dict[str, Any],
         word_limit: int = 1200,
+        access_tier: str = "standard",
     ) -> dict[str, Any]:
         payload = {
-            "key": self.build_key(category, keyword, info, word_limit),
+            "key": self.build_key(category, keyword, info, word_limit, access_tier),
             "category": category,
             "keyword": keyword,
             "info": info,
             "word_limit": int(word_limit),
+            "access_tier": access_tier or "standard",
             "article": article,
         }
-        path = self.path_for(category, keyword, info, word_limit)
+        path = self.path_for(category, keyword, info, word_limit, access_tier)
         ensure_dir(path.parent)
         path.write_text(__import__("json").dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         return payload
 
-    def path_for(self, category: str, keyword: str, info: str, word_limit: int = 1200) -> Path:
-        return self.cache_dir / f"{self.build_key(category, keyword, info, word_limit)}.json"
+    def path_for(
+        self,
+        category: str,
+        keyword: str,
+        info: str,
+        word_limit: int = 1200,
+        access_tier: str = "standard",
+    ) -> Path:
+        return self.cache_dir / f"{self.build_key(category, keyword, info, word_limit, access_tier)}.json"

@@ -27,13 +27,18 @@ class WriterService:
         info: str,
         language: str = "English",
         word_limit: int = 1200,
+        access_tier: str = "standard",
         include_cover: int = 1,
         content_image_count: int = 3,
     ) -> dict[str, Any]:
         normalized_word_limit = max(200, int(word_limit))
         if self.llm_client.enabled:
             strategy_prompt = build_strategy_prompt(category, keyword, info, language)
-            raw_strategy = self.llm_client.complete(strategy_prompt, expect_json=True)
+            raw_strategy = self.llm_client.complete(
+                strategy_prompt,
+                expect_json=True,
+                access_tier=access_tier,
+            )
             strategy = extract_json_object(raw_strategy)
 
             draft_prompt = build_draft_prompt(
@@ -44,7 +49,7 @@ class WriterService:
                 strategy,
                 normalized_word_limit,
             )
-            draft_html = self.llm_client.complete(draft_prompt)
+            draft_html = self.llm_client.complete(draft_prompt, access_tier=access_tier)
 
             polish_prompt = build_polish_prompt(
                 category,
@@ -53,7 +58,7 @@ class WriterService:
                 draft_html,
                 normalized_word_limit,
             )
-            polished_html = self.llm_client.complete(polish_prompt)
+            polished_html = self.llm_client.complete(polish_prompt, access_tier=access_tier)
 
             article = self._package_article(
                 category=category,

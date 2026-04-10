@@ -54,7 +54,8 @@
 - 自动把图片注入最终 HTML 预览
 - 内置 Web Demo 页面，方便直接演示
 - 默认支持 `mock mode`，不开 API Key 也能跑通流程
-- 可切换到 OpenAI-compatible 接口，方便接 OpenAI / OpenRouter / 自建兼容网关
+- 可切换到 Azure OpenAI Responses API，支持普通 key / VIP key 命中不同 GPT 部署
+- 仍可回退到 OpenAI-compatible 接口，方便接 OpenAI / OpenRouter / 自建兼容网关
 
 ---
 
@@ -232,9 +233,13 @@ docker compose --env-file .env.docker down -v
 | `APP_DATA_DIR` | `./data` | Data directory |
 | `MAX_WORKERS` | `2` | Async worker count |
 | `LLM_MOCK_MODE` | `true` | Use local mock output instead of real LLM |
-| `OPENAI_API_KEY` | empty | OpenAI-compatible API key |
-| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | API base URL |
-| `OPENAI_MODEL` | `gpt-4.1-mini` | Model name |
+| `AZURE_OPENAI_API_KEY` | empty | Azure OpenAI API key for text generation |
+| `AZURE_OPENAI_RESPONSES_URL` | empty | Full Azure Responses API URL, for example `https://YOUR-RESOURCE.openai.azure.com/openai/responses?api-version=2025-04-01-preview` |
+| `AZURE_OPENAI_STANDARD_MODEL` | `gpt-5.4-mini` | Azure deployment name used for `NORMAL_ACCESS_KEY` requests |
+| `AZURE_OPENAI_VIP_MODEL` | `gpt-5.4` | Azure deployment name used for `VIP_ACCESS_KEY` requests |
+| `OPENAI_API_KEY` | empty | Optional OpenAI-compatible API key used only when Azure Responses is not configured |
+| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | Optional fallback API base URL |
+| `OPENAI_MODEL` | `gpt-4.1-mini` | Optional fallback model name |
 | `OPENAI_REQUEST_TIMEOUT` | `90` | Request timeout |
 | `AZURE_IMAGE_API_URL` | empty | Full Azure image generation URL |
 | `AZURE_IMAGE_API_KEY` | empty | Azure image generation key |

@@ -44,6 +44,7 @@ class TaskService:
         normalized_language = (language or "English").strip() or "English"
         normalized_info = info or ""
         normalized_word_limit = max(200, min(10000, int(word_limit)))
+        normalized_access_tier = (access_tier or "standard").strip().lower() or "standard"
 
         if not normalized_keyword:
             raise ValueError("A keyword is required.")
@@ -55,6 +56,7 @@ class TaskService:
                 info=normalized_info,
                 language=normalized_language,
                 word_limit=normalized_word_limit,
+                access_tier=normalized_access_tier,
             )
             if reusable_task:
                 return self.get_task(int(reusable_task["task_id"])) or reusable_task
@@ -69,12 +71,13 @@ class TaskService:
                 "force_refresh": bool(force_refresh),
                 "include_cover": max(0, min(1, int(include_cover))),
                 "content_image_count": max(0, min(3, int(content_image_count))),
-                "access_tier": access_tier,
+                "access_tier": normalized_access_tier,
                 "cache_key": self.cache_service.build_key(
                     normalized_category,
                     normalized_keyword,
                     normalized_info,
                     normalized_word_limit,
+                    normalized_access_tier,
                 ),
                 "status": "queued",
             }
@@ -123,6 +126,7 @@ class TaskService:
                     task["keyword"],
                     task["info"],
                     task.get("word_limit", 1200),
+                    task.get("access_tier", "standard"),
                 )
 
             if cached:
@@ -144,6 +148,7 @@ class TaskService:
                         task["info"],
                         article,
                         task.get("word_limit", 1200),
+                        task.get("access_tier", "standard"),
                     )
                 cache_hit = True
             else:
@@ -154,6 +159,7 @@ class TaskService:
                     info=task["info"],
                     language=task["language"],
                     word_limit=task.get("word_limit", 1200),
+                    access_tier=task.get("access_tier", "standard"),
                     include_cover=task.get("include_cover", 1),
                     content_image_count=task.get("content_image_count", 0),
                 )
@@ -163,6 +169,7 @@ class TaskService:
                     task["info"],
                     article,
                     task.get("word_limit", 1200),
+                    task.get("access_tier", "standard"),
                 )
                 cache_hit = False
 

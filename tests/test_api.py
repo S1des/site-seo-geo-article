@@ -12,6 +12,12 @@ def issue_token(client: TestClient) -> dict:
     return response.json()["data"]
 
 
+def issue_standard_token(client: TestClient) -> dict:
+    response = client.post("/api/token", json={"access_key": "test-standard-key"})
+    assert response.status_code == 200
+    return response.json()["data"]
+
+
 def wait_for_task_completion(client: TestClient, bearer: dict[str, str], task_id: int, timeout: float = 5.0) -> dict:
     deadline = time.time() + timeout
     while time.time() < deadline:
@@ -308,6 +314,54 @@ def test_word_limit_creates_distinct_task_when_changed(tmp_path: Path) -> None:
     assert second_task_id != first_task_id
     second_task = wait_for_task_completion(client, bearer, second_task_id)
     assert second_task["word_limit"] == 1800
+
+
+def test_reuse_existing_task_is_scoped_by_access_tier(tmp_path: Path) -> None:
+    app = create_app(
+        {
+            "data_dir": tmp_path,
+            "llm_mock_mode": True,
+            "openai_api_key": "",
+            "normal_access_key": "test-standard-key",
+            "vip_access_key": "test-vip-key",
+            "token_signing_secret": "test-signing-secret",
+        }
+    )
+    client = TestClient(app)
+    standard_token = issue_standard_token(client)
+    vip_token = issue_token(client)
+    standard_bearer = {"Authorization": f"Bearer {standard_token['access_token']}"}
+    vip_bearer = {"Authorization": f"Bearer {vip_token['access_token']}"}
+
+    standard_response = client.post(
+        "/api/tasks",
+        headers=standard_bearer,
+        json={
+            "category": "seo",
+            "keyword": "same keyword tier split",
+            "info": "Brand: VoltGo",
+            "include_cover": 0,
+            "content_image_count": 0,
+        },
+    )
+    assert standard_response.status_code == 200
+    standard_task_id = standard_response.json()["data"]["task_id"]
+    wait_for_task_completion(client, standard_bearer, standard_task_id)
+
+    vip_response = client.post(
+        "/api/tasks",
+        headers=vip_bearer,
+        json={
+            "category": "seo",
+            "keyword": "same keyword tier split",
+            "info": "Brand: VoltGo",
+            "force_refresh": False,
+            "include_cover": 0,
+            "content_image_count": 0,
+        },
+    )
+    assert vip_response.status_code == 200
+    assert vip_response.json()["data"]["task_id"] != standard_task_id
 
 
 def test_list_tasks_returns_recent_entries_in_desc_order(tmp_path: Path) -> None:

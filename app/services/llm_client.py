@@ -13,12 +13,79 @@ class LLMClient:
 
     @property
     def enabled(self) -> bool:
-        return bool(self.settings.openai_api_key and not self.settings.llm_mock_mode)
+        return bool((self._azure_enabled() or self._openai_enabled()) and not self.settings.llm_mock_mode)
 
-    def complete(self, prompt: str, *, expect_json: bool = False) -> str:
+    def complete(self, prompt: str, *, expect_json: bool = False, access_tier: str = "standard") -> str:
         if not self.enabled:
             raise RuntimeError("LLM client is disabled. Configure OPENAI_API_KEY or use mock mode.")
 
+        if self._azure_enabled():
+            return self._complete_with_azure_responses(prompt, expect_json=expect_json, access_tier=access_tier)
+        return self._complete_with_chat_completions(prompt, expect_json=expect_json)
+
+    def _azure_enabled(self) -> bool:
+        return bool(self.settings.azure_openai_api_key and self.settings.azure_openai_responses_url)
+
+    def _openai_enabled(self) -> bool:
+        return bool(self.settings.openai_api_key)
+
+    def _model_for_tier(self, access_tier: str) -> str:
+        if (access_tier or "").strip().lower() == "vip":
+            return self.settings.azure_openai_vip_model or self.settings.azure_openai_standard_model
+        return self.settings.azure_openai_standard_model
+
+    def _complete_with_azure_responses(self, prompt: str, *, expect_json: bool, access_tier: str) -> str:
+        response = requests.post(
+            self.settings.azure_openai_responses_url,
+            headers={
+                "Content-Type": "application/json",
+                "api-key": self.settings.azure_openai_api_key,
+            },
+            json={
+                "model": self._model_for_tier(access_tier),
+                "input": [
+                    {
+                        "role": "system",
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": (
+                                    "You are a precise writing assistant. "
+                                    "Follow formatting rules exactly."
+                                ),
+                            }
+                        ],
+                    },
+                    {
+                        "role": "user",
+                        "content": [{"type": "input_text", "text": prompt}],
+                    },
+                ],
+            },
+            timeout=self.settings.openai_request_timeout,
+        )
+        response.raise_for_status()
+        payload: dict[str, Any] = response.json()
+        if payload.get("error"):
+            raise RuntimeError(str(payload["error"]))
+
+        output_text = payload.get("output_text")
+        if isinstance(output_text, str) and output_text.strip():
+            return output_text
+
+        fragments: list[str] = []
+        for item in payload.get("output") or []:
+            if item.get("type") != "message":
+                continue
+            for content in item.get("content") or []:
+                if content.get("type") == "output_text" and isinstance(content.get("text"), str):
+                    fragments.append(content["text"])
+        text = "\n".join(fragment for fragment in fragments if fragment.strip()).strip()
+        if not text:
+            raise RuntimeError("No response text returned from Azure Responses API.")
+        return text
+
+    def _complete_with_chat_completions(self, prompt: str, *, expect_json: bool) -> str:
         response = requests.post(
             f"{self.settings.openai_base_url}/chat/completions",
             headers={

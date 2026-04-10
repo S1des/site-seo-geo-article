@@ -41,6 +41,7 @@ class TaskRepository(Protocol):
         info: str,
         language: str,
         word_limit: int,
+        access_tier: str,
     ) -> dict[str, Any] | None: ...
 
     def update_task(self, task_id: int, **fields: Any) -> None: ...
@@ -120,6 +121,7 @@ class MemoryTaskRepository:
         info: str,
         language: str,
         word_limit: int,
+        access_tier: str,
     ) -> dict[str, Any] | None:
         with self._lock:
             matches = [
@@ -130,6 +132,7 @@ class MemoryTaskRepository:
                 and task.get("info") == info
                 and task.get("language") == language
                 and int(task.get("word_limit", 1200)) == int(word_limit)
+                and str(task.get("access_tier") or "standard") == access_tier
                 and task.get("status") == "completed"
                 and int(task.get("task_id", 0)) in self._results
             ]
@@ -278,6 +281,7 @@ class MySQLTaskRepository:
         info: str,
         language: str,
         word_limit: int,
+        access_tier: str,
     ) -> dict[str, Any] | None:
         def _operation(connection: Any) -> dict[str, Any] | None:
             with connection.cursor() as cursor:
@@ -291,11 +295,12 @@ class MySQLTaskRepository:
                       AND t.info = %s
                       AND t.language = %s
                       AND t.word_limit = %s
+                      AND t.access_tier = %s
                       AND t.status = 'completed'
                     ORDER BY t.id DESC
                     LIMIT 1
                     """,
-                    (category, keyword, info, language, int(word_limit)),
+                    (category, keyword, info, language, int(word_limit), access_tier),
                 )
                 return cursor.fetchone()
 

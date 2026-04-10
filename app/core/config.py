@@ -26,6 +26,10 @@ class Settings:
     openai_base_url: str = "https://api.openai.com/v1"
     openai_model: str = "gpt-4.1-mini"
     openai_request_timeout: int = 90
+    azure_openai_api_key: str = ""
+    azure_openai_responses_url: str = ""
+    azure_openai_standard_model: str = "gpt-5.4-mini"
+    azure_openai_vip_model: str = "gpt-5.4"
     azure_image_api_url: str = ""
     azure_image_api_key: str = ""
     azure_image_endpoint: str = ""
@@ -86,6 +90,10 @@ class Settings:
             openai_base_url=os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/"),
             openai_model=os.getenv("OPENAI_MODEL", "gpt-4.1-mini").strip(),
             openai_request_timeout=int(os.getenv("OPENAI_REQUEST_TIMEOUT", "90")),
+            azure_openai_api_key=os.getenv("AZURE_OPENAI_API_KEY", "").strip(),
+            azure_openai_responses_url=os.getenv("AZURE_OPENAI_RESPONSES_URL", "").strip(),
+            azure_openai_standard_model=os.getenv("AZURE_OPENAI_STANDARD_MODEL", "gpt-5.4-mini").strip(),
+            azure_openai_vip_model=os.getenv("AZURE_OPENAI_VIP_MODEL", "gpt-5.4").strip(),
             azure_image_api_url=os.getenv("AZURE_IMAGE_API_URL", "").strip(),
             azure_image_api_key=os.getenv("AZURE_IMAGE_API_KEY", "").strip(),
             azure_image_endpoint=os.getenv("AZURE_IMAGE_ENDPOINT", "").strip().rstrip("/"),
