@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{{ page_title }}</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', path='demo/favicon.svg') }}" />
     <link rel="stylesheet" href="{{ url_for('static', path='demo/style.css') }}" />
     <script src="{{ url_for('static', path='demo/demo.js') }}" defer></script>
   </head>
@@ -92,7 +93,7 @@
           <div class="card-header">
             <div class="card-title">
               <strong>2. Create Task</strong>
-              <span>Submit one or more keywords through the live API after a valid token has been exchanged.</span>
+              <span>Submit a single keyword task through the live API after a valid token has been exchanged.</span>
             </div>
             <span class="pill">Demo Client</span>
           </div>
@@ -126,8 +127,8 @@
                 </select>
               </label>
               <label class="full">
-                Keywords
-                <textarea name="keywords" rows="5" required placeholder="portable charger on plane&#10;tsa power bank rules&#10;best travel charger for flights"></textarea>
+                Keyword
+                <input type="text" name="keyword" required placeholder="portable charger on plane" />
               </label>
               <label class="full">
                 Brand / Product Info
@@ -202,8 +203,8 @@
                     <p>Answer-first layout, proof blocks, references, trust cues, and entity alignment.</p>
                   </div>
                   <div class="mini-card">
-                    <strong>Cache</strong>
-                    <p>Each keyword is cached independently using category + normalized keyword + normalized brand info.</p>
+                  <strong>Cache</strong>
+                    <p>Each task stores a single keyword, while cache reuse still keys off category + keyword + normalized brand info.</p>
                   </div>
                 </div>
                 <div class="inline-list">
@@ -266,7 +267,7 @@
   -H "Content-Type: application/json" \
   -d '{
     "category": "seo",
-    "keywords": ["portable charger on plane"],
+    "keyword": "portable charger on plane",
     "info": "Brand: VoltGo. Product: 20000mAh portable charger.",
     "include_cover": 1,
     "content_image_count": 2

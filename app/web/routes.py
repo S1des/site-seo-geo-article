@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from app.core.runtime import AppServices
 from app.web.context import build_demo_page_context
@@ -19,5 +19,9 @@ def create_web_router(services: AppServices) -> APIRouter:
         )
         context["request"] = request
         return services.templates.TemplateResponse(request, "demo/index.html", context)
+
+    @router.get("/favicon.ico", include_in_schema=False)
+    async def favicon() -> RedirectResponse:
+        return RedirectResponse(url="/static/demo/favicon.svg", status_code=307)
 
     return router

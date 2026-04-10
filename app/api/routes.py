@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Header, status
 from fastapi.responses import JSONResponse
 
 from app.core.runtime import AppServices
 from app.services.task_service import FINAL_STATUSES
-from app.utils.common import split_keywords
 from .schemas import (
     ErrorResponse,
     TaskAcceptedData,
@@ -16,6 +17,8 @@ from .schemas import (
     TokenExchangeRequest,
     TokenExchangeResponse,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def resolve_auth_payload(services: AppServices, authorization: str | None) -> dict[str, str] | None:
@@ -58,6 +61,7 @@ def create_api_router(services: AppServices) -> APIRouter:
         authorization: str | None = Header(default=None),
     ) -> TaskCreateResponse | JSONResponse:
         category = payload.category.strip().lower()
+        keyword = payload.keyword.strip()
         info = (payload.info or payload.brand_info or "").strip()
         language = (payload.language or "English").strip() or "English"
         auth_payload = resolve_auth_payload(services, authorization)
@@ -74,23 +78,29 @@ def create_api_router(services: AppServices) -> APIRouter:
                 content={"success": False, "message": "valid bearer token is required"},
             )
 
-        keywords = split_keywords(payload.keywords)
-        if not keywords:
+        if not keyword:
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                content={"success": False, "message": "keywords is required"},
+                content={"success": False, "message": "keyword is required"},
             )
 
-        task = services.task_service.create_task(
-            category=category,
-            keywords=keywords,
-            info=info,
-            language=language,
-            force_refresh=payload.force_refresh,
-            include_cover=payload.include_cover,
-            content_image_count=payload.content_image_count,
-            access_tier=auth_payload["tier"],
-        )
+        try:
+            task = services.task_service.create_task(
+                category=category,
+                keyword=keyword,
+                info=info,
+                language=language,
+                force_refresh=payload.force_refresh,
+                include_cover=payload.include_cover,
+                content_image_count=payload.content_image_count,
+                access_tier=auth_payload["tier"],
+            )
+        except Exception:
+            logger.exception("Task service unavailable while creating a task.")
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={"success": False, "message": "task service is temporarily unavailable"},
+            )
         return TaskCreateResponse(
             data=TaskAcceptedData(
                 task_id=task["task_id"],
@@ -107,7 +117,7 @@ def create_api_router(services: AppServices) -> APIRouter:
         summary="Fetch an async task result",
     )
     async def get_task(
-        task_id: str,
+        task_id: int,
         authorization: str | None = Header(default=None),
     ) -> TaskDetailResponse | JSONResponse:
         auth_payload = resolve_auth_payload(services, authorization)
@@ -117,13 +127,36 @@ def create_api_router(services: AppServices) -> APIRouter:
                 content={"success": False, "message": "valid bearer token is required"},
             )
 
-        task = services.task_service.get_task(task_id)
+        try:
+            task = services.task_service.get_task(task_id)
+        except Exception:
+            logger.exception("Task service unavailable while fetching task_id=%s.", task_id)
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={
+                    "success": False,
+                    "message": "task service is temporarily unavailable",
+                    "status": "error",
+                    "task_id": task_id,
+                },
+            )
         if not task:
             return JSONResponse(
                 status_code=status.HTTP_404_NOT_FOUND,
                 content={"success": False, "message": "task not found"},
             )
-        if task.get("status") not in FINAL_STATUSES:
+        if task.get("status") == "failed":
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={
+                    "success": False,
+                    "message": task.get("error_message") or "task failed",
+                    "status": "failed",
+                    "task_id": task_id,
+                    "error": task.get("error_message"),
+                },
+            )
+        if task.get("status") not in FINAL_STATUSES or not task.get("article"):
             return JSONResponse(
                 status_code=status.HTTP_200_OK,
                 content={

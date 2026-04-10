@@ -1,18 +1,15 @@
 from __future__ import annotations
 
-import uuid
 from concurrent.futures import ThreadPoolExecutor
-from copy import deepcopy
-from pathlib import Path
-from threading import Lock
 from typing import Any
 
 from app.services.cache_service import CacheService
+from app.services.task_repository import TaskRepository
 from app.services.writer_service import WriterService
-from app.utils.common import atomic_write_json, ensure_dir, load_json, split_keywords, utcnow_iso
+from app.utils.common import normalize_text, utcnow_iso
 
 
-FINAL_STATUSES = {"completed", "failed", "partial_failed"}
+FINAL_STATUSES = {"completed", "failed"}
 
 
 class TaskService:
@@ -21,39 +18,19 @@ class TaskService:
         *,
         writer_service: WriterService,
         cache_service: CacheService,
-        tasks_dir: Path,
+        task_repository: TaskRepository,
         max_workers: int = 2,
     ) -> None:
         self.writer_service = writer_service
         self.cache_service = cache_service
-        self.tasks_dir = tasks_dir
+        self.task_repository = task_repository
         self.executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="article-task")
-        self._lock = Lock()
-        self._tasks: dict[str, dict[str, Any]] = {}
-        ensure_dir(tasks_dir)
-        self._load_existing_tasks()
-
-    def _load_existing_tasks(self) -> None:
-        for path in sorted(self.tasks_dir.glob("*.json")):
-            try:
-                payload = load_json(path)
-                self._tasks[payload["task_id"]] = payload
-            except Exception:
-                continue
-
-    def _task_path(self, task_id: str) -> Path:
-        return self.tasks_dir / f"{task_id}.json"
-
-    def _save_task(self, task: dict[str, Any]) -> None:
-        task["updated_at"] = utcnow_iso()
-        self._tasks[task["task_id"]] = task
-        atomic_write_json(self._task_path(task["task_id"]), task)
 
     def create_task(
         self,
         *,
         category: str,
-        keywords: list[str] | str,
+        keyword: str,
         info: str,
         language: str = "English",
         force_refresh: bool = False,
@@ -61,145 +38,122 @@ class TaskService:
         content_image_count: int = 3,
         access_tier: str = "standard",
     ) -> dict[str, Any]:
-        keyword_list = split_keywords(keywords)
-        if not keyword_list:
-            raise ValueError("At least one keyword is required.")
+        normalized_category = normalize_text(category)
+        normalized_keyword = keyword.strip()
+        normalized_language = (language or "English").strip() or "English"
+        normalized_info = info or ""
 
-        task_id = uuid.uuid4().hex
-        now = utcnow_iso()
-        task = {
-            "task_id": task_id,
-            "category": category,
-            "keywords": keyword_list,
-            "info": info,
-            "language": language,
-            "force_refresh": force_refresh,
-            "include_cover": max(0, min(1, int(include_cover))),
-            "content_image_count": max(0, min(3, int(content_image_count))),
-            "access_tier": access_tier,
-            "status": "queued",
-            "created_at": now,
-            "updated_at": now,
-            "items": [
-                {
-                    "keyword": keyword,
-                    "cache_key": self.cache_service.build_key(category, keyword, info),
-                    "status": "pending",
-                    "cache_hit": False,
-                    "article": None,
-                    "error": None,
-                }
-                for keyword in keyword_list
-            ],
-        }
+        if not normalized_keyword:
+            raise ValueError("A keyword is required.")
 
-        with self._lock:
-            self._save_task(task)
+        if not force_refresh:
+            reusable_task = self.task_repository.find_reusable_task(
+                category=normalized_category,
+                keyword=normalized_keyword,
+                info=normalized_info,
+                language=normalized_language,
+            )
+            if reusable_task:
+                return self.get_task(int(reusable_task["task_id"])) or reusable_task
 
-        self.executor.submit(self._run_task, task_id)
-        return self.get_task(task_id)
+        task = self.task_repository.create_task(
+            {
+                "category": normalized_category,
+                "keyword": normalized_keyword,
+                "info": normalized_info,
+                "language": normalized_language,
+                "force_refresh": bool(force_refresh),
+                "include_cover": max(0, min(1, int(include_cover))),
+                "content_image_count": max(0, min(3, int(content_image_count))),
+                "access_tier": access_tier,
+                "cache_key": self.cache_service.build_key(normalized_category, normalized_keyword, normalized_info),
+                "status": "queued",
+            }
+        )
+        self.executor.submit(self._run_task, int(task["task_id"]))
+        return self.get_task(int(task["task_id"])) or task
 
-    def get_task(self, task_id: str) -> dict[str, Any] | None:
-        task = self._tasks.get(task_id)
+    def get_task(self, task_id: int) -> dict[str, Any] | None:
+        task = self.task_repository.get_task(int(task_id))
         if not task:
-            path = self._task_path(task_id)
-            if not path.exists():
-                return None
-            task = load_json(path)
-            self._tasks[task_id] = task
-        return self._build_response_payload(task)
+            return None
 
-    def _compute_progress(self, items: list[dict[str, Any]]) -> dict[str, int]:
-        completed = sum(1 for item in items if item["status"] == "completed")
-        failed = sum(1 for item in items if item["status"] == "failed")
-        cached = sum(1 for item in items if item["cache_hit"])
-        return {
-            "total": len(items),
-            "completed": completed,
-            "failed": failed,
-            "cached": cached,
+        payload = dict(task)
+        result = self.task_repository.get_result(int(task_id))
+        if result:
+            payload["article"] = self.writer_service.present_article(
+                asset_namespace=payload["cache_key"],
+                article=result["article"],
+                include_cover=payload.get("include_cover", 1),
+                content_image_count=payload.get("content_image_count", 3),
+            )
+        else:
+            payload["article"] = None
+
+        payload["progress"] = {
+            "total": 1,
+            "completed": 1 if payload["status"] == "completed" else 0,
+            "failed": 1 if payload["status"] == "failed" else 0,
+            "cached": 1 if payload["cache_hit"] else 0,
         }
-
-    def _build_response_payload(self, task: dict[str, Any]) -> dict[str, Any]:
-        payload = deepcopy(task)
-        for item in payload["items"]:
-            if item.get("article"):
-                item["article"] = self.writer_service.present_article(
-                    asset_namespace=item["cache_key"],
-                    article=item["article"],
-                    include_cover=payload.get("include_cover", 1),
-                    content_image_count=payload.get("content_image_count", 3),
-                )
-        payload["progress"] = self._compute_progress(payload["items"])
         return payload
 
-    def _run_task(self, task_id: str) -> None:
-        with self._lock:
-            task = deepcopy(self._tasks[task_id])
-            task["status"] = "running"
-            self._save_task(task)
+    def _run_task(self, task_id: int) -> None:
+        task = self.task_repository.get_task(task_id)
+        if not task:
+            return
 
-        for item in task["items"]:
-            keyword = item["keyword"]
-            cache_key = item["cache_key"]
-            try:
-                cached = None
-                if not task["force_refresh"]:
-                    cached = self.cache_service.get(task["category"], keyword, task["info"])
+        self.task_repository.update_task(task_id, status="running", error_message=None)
+        task = self.task_repository.get_task(task_id)
+        if not task:
+            return
 
-                if cached:
-                    article = cached["article"]
-                    needs_images = (
-                        task.get("include_cover", 1) > 0 or task.get("content_image_count", 3) > 0
-                    )
-                    if needs_images:
-                        article = self.writer_service.ensure_images(
-                            asset_namespace=cache_key,
-                            article=article,
-                            category=task["category"],
-                            keyword=keyword,
-                            info=task["info"],
-                            include_cover=task.get("include_cover", 1),
-                            content_image_count=task.get("content_image_count", 3),
-                        )
-                        self.cache_service.set(task["category"], keyword, task["info"], article)
-                    item["status"] = "completed"
-                    item["cache_hit"] = True
-                    item["article"] = article
-                    item["error"] = None
-                else:
-                    item["status"] = "running"
-                    with self._lock:
-                        self._save_task(task)
+        try:
+            cached = None
+            if not task["force_refresh"]:
+                cached = self.cache_service.get(task["category"], task["keyword"], task["info"])
 
-                    article = self.writer_service.generate(
-                        asset_namespace=cache_key,
+            if cached:
+                article = cached["article"]
+                needs_images = task.get("include_cover", 1) > 0 or task.get("content_image_count", 0) > 0
+                if needs_images:
+                    article = self.writer_service.ensure_images(
+                        asset_namespace=task["cache_key"],
+                        article=article,
                         category=task["category"],
-                        keyword=keyword,
+                        keyword=task["keyword"],
                         info=task["info"],
-                        language=task["language"],
                         include_cover=task.get("include_cover", 1),
-                        content_image_count=task.get("content_image_count", 3),
+                        content_image_count=task.get("content_image_count", 0),
                     )
-                    self.cache_service.set(task["category"], keyword, task["info"], article)
-                    item["status"] = "completed"
-                    item["cache_hit"] = False
-                    item["article"] = article
-                    item["error"] = None
-            except Exception as exc:
-                item["status"] = "failed"
-                item["error"] = str(exc)
+                    self.cache_service.set(task["category"], task["keyword"], task["info"], article)
+                cache_hit = True
+            else:
+                article = self.writer_service.generate(
+                    asset_namespace=task["cache_key"],
+                    category=task["category"],
+                    keyword=task["keyword"],
+                    info=task["info"],
+                    language=task["language"],
+                    include_cover=task.get("include_cover", 1),
+                    content_image_count=task.get("content_image_count", 0),
+                )
+                self.cache_service.set(task["category"], task["keyword"], task["info"], article)
+                cache_hit = False
 
-            with self._lock:
-                self._save_task(task)
-
-        failed_count = sum(1 for item in task["items"] if item["status"] == "failed")
-        if failed_count == len(task["items"]):
-            task["status"] = "failed"
-        elif failed_count > 0:
-            task["status"] = "partial_failed"
-        else:
-            task["status"] = "completed"
-
-        with self._lock:
-            self._save_task(task)
+            self.task_repository.save_result(task_id, article)
+            self.task_repository.update_task(
+                task_id,
+                status="completed",
+                cache_hit=cache_hit,
+                error_message=None,
+                completed_at=utcnow_iso(),
+            )
+        except Exception as exc:
+            self.task_repository.update_task(
+                task_id,
+                status="failed",
+                cache_hit=False,
+                error_message=str(exc),
+                completed_at=utcnow_iso(),
+            )

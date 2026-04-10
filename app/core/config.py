@@ -5,6 +5,13 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
 @dataclass(slots=True)
 class Settings:
     host: str = "0.0.0.0"
@@ -12,7 +19,6 @@ class Settings:
     debug: bool = True
     data_dir: Path = Path("data")
     cache_dir: Path = Path("data/cache")
-    tasks_dir: Path = Path("data/tasks")
     image_dir: Path = Path("data/images")
     max_workers: int = 2
     llm_mock_mode: bool = True
@@ -33,12 +39,26 @@ class Settings:
     vip_access_key: str = ""
     token_signing_secret: str = ""
     token_ttl_seconds: int = 86400
+    mysql_host: str = ""
+    mysql_port: int = 3306
+    mysql_user: str = ""
+    mysql_password: str = ""
+    mysql_database: str = ""
+    mysql_charset: str = "utf8mb4"
+    mysql_connect_timeout: int = 10
+    mysql_read_timeout: int = 20
+    mysql_write_timeout: int = 20
+    mysql_retry_count: int = 3
+    mysql_retry_delay_seconds: float = 0.6
+    mysql_pool_size: int = 8
+    mysql_fallback_to_memory: bool = False
 
     @classmethod
     def from_env(cls) -> "Settings":
         data_dir = Path(os.getenv("APP_DATA_DIR", "data"))
         normal_access_key = os.getenv("NORMAL_ACCESS_KEY", "").strip()
         vip_access_key = os.getenv("VIP_ACCESS_KEY", "").strip()
+        mysql_user = os.getenv("MYSQL_USER", "").strip()
         token_signing_secret = os.getenv("TOKEN_SIGNING_SECRET", "").strip() or "||".join(
             item for item in [vip_access_key, normal_access_key, "site-seo-geo-article"] if item
         )
@@ -48,7 +68,6 @@ class Settings:
             debug=os.getenv("FLASK_DEBUG", "true").lower() == "true",
             data_dir=data_dir,
             cache_dir=data_dir / "cache",
-            tasks_dir=data_dir / "tasks",
             image_dir=data_dir / "images",
             max_workers=int(os.getenv("MAX_WORKERS", "2")),
             llm_mock_mode=os.getenv("LLM_MOCK_MODE", "true").lower() == "true",
@@ -72,4 +91,17 @@ class Settings:
             vip_access_key=vip_access_key,
             token_signing_secret=token_signing_secret,
             token_ttl_seconds=max(60, int(os.getenv("TOKEN_TTL_SECONDS", "86400"))),
+            mysql_host=os.getenv("MYSQL_HOST", "").strip(),
+            mysql_port=int(os.getenv("MYSQL_PORT", "3306")),
+            mysql_user=mysql_user,
+            mysql_password=os.getenv("MYSQL_PASSWORD", "").strip(),
+            mysql_database=os.getenv("MYSQL_DATABASE", "").strip() or mysql_user,
+            mysql_charset=os.getenv("MYSQL_CHARSET", "utf8mb4").strip() or "utf8mb4",
+            mysql_connect_timeout=max(3, int(os.getenv("MYSQL_CONNECT_TIMEOUT", "10"))),
+            mysql_read_timeout=max(3, int(os.getenv("MYSQL_READ_TIMEOUT", "20"))),
+            mysql_write_timeout=max(3, int(os.getenv("MYSQL_WRITE_TIMEOUT", "20"))),
+            mysql_retry_count=max(1, int(os.getenv("MYSQL_RETRY_COUNT", "3"))),
+            mysql_retry_delay_seconds=max(0.1, float(os.getenv("MYSQL_RETRY_DELAY_SECONDS", "0.6"))),
+            mysql_pool_size=max(1, int(os.getenv("MYSQL_POOL_SIZE", "8"))),
+            mysql_fallback_to_memory=_env_bool("MYSQL_FALLBACK_TO_MEMORY", False),
         )

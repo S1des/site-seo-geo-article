@@ -217,6 +217,19 @@ http://127.0.0.1:8028
 | `VIP_ACCESS_KEY` | empty | VIP access key used to exchange a bearer token |
 | `TOKEN_SIGNING_SECRET` | empty | Secret used to sign exchanged bearer tokens |
 | `TOKEN_TTL_SECONDS` | `86400` | Bearer token lifetime in seconds |
+| `MYSQL_HOST` | empty | MySQL host; when empty, uses in-memory task storage |
+| `MYSQL_PORT` | `3306` | MySQL port |
+| `MYSQL_USER` | empty | MySQL username |
+| `MYSQL_PASSWORD` | empty | MySQL password |
+| `MYSQL_DATABASE` | empty | MySQL database name; falls back to `MYSQL_USER` when empty |
+| `MYSQL_CHARSET` | `utf8mb4` | MySQL charset |
+| `MYSQL_CONNECT_TIMEOUT` | `10` | MySQL connection timeout seconds |
+| `MYSQL_READ_TIMEOUT` | `20` | MySQL read timeout seconds |
+| `MYSQL_WRITE_TIMEOUT` | `20` | MySQL write timeout seconds |
+| `MYSQL_RETRY_COUNT` | `3` | Retry count for transient MySQL connection errors |
+| `MYSQL_RETRY_DELAY_SECONDS` | `0.6` | Delay between MySQL retries |
+| `MYSQL_POOL_SIZE` | `8` | MySQL connection pool size |
+| `MYSQL_FALLBACK_TO_MEMORY` | `false` | Fall back to in-memory task storage when MySQL init fails |
 | `IS_PROD` | `N` | Start in background when set to `Y` |
 | `AUTO_KILL_PORT` | `N` | Kill the requested port instead of auto-switching |
 
@@ -249,7 +262,7 @@ curl -X POST http://127.0.0.1:8028/api/tasks \
   -H "Content-Type: application/json" \
   -d '{
     "category": "seo",
-    "keywords": ["portable charger on plane", "tsa power bank rules"],
+    "keyword": "portable charger on plane",
     "info": "Brand: VoltGo. Product: 20000mAh portable charger for travel.",
     "language": "English",
     "include_cover": 1,
@@ -263,7 +276,7 @@ Response:
 {
   "success": true,
   "data": {
-    "task_id": "4ce7c5807d8b4c4d91538e1b10fd9556",
+    "task_id": 248,
     "status": "queued"
   }
 }
@@ -272,7 +285,7 @@ Response:
 ### Get Task
 
 ```bash
-curl http://127.0.0.1:8028/api/tasks/4ce7c5807d8b4c4d91538e1b10fd9556 \
+curl http://127.0.0.1:8028/api/tasks/248 \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
@@ -282,44 +295,42 @@ Response:
 {
   "success": true,
   "data": {
-    "task_id": "4ce7c5807d8b4c4d91538e1b10fd9556",
+    "task_id": 248,
+    "category": "seo",
+    "keyword": "portable charger on plane",
     "status": "completed",
+    "cache_hit": true,
     "progress": {
-      "total": 2,
-      "completed": 2,
+      "total": 1,
+      "completed": 1,
       "failed": 0,
       "cached": 1
     },
-    "items": [
-      {
-        "keyword": "portable charger on plane",
-        "status": "completed",
-        "cache_hit": true,
-        "article": {
-          "title": "...",
-          "meta_title": "...",
-          "meta_description": "...",
-          "html": "...",
-          "generation_mode": "llm",
-          "image_generation_mode": "azure",
-          "images": [
-            {
-              "role": "cover",
-              "url": "data:image/png;base64,..."
-            }
-          ]
+    "article": {
+      "title": "...",
+      "meta_title": "...",
+      "meta_description": "...",
+      "html": "...",
+      "generation_mode": "llm",
+      "image_generation_mode": "azure",
+      "images": [
+        {
+          "role": "cover",
+          "url": "data:image/png;base64,..."
         }
-      }
-    ]
+      ]
+    }
   }
 }
 ```
+
+任务元数据和最终文章结果现在分别持久化到 MySQL 的 `article_tasks` 与 `article_task_results` 表；文件缓存仍按 `category + keyword + info` 维度保留在本地 `data/cache/` 下。
 
 ---
 
 ## Cache Strategy
 
-缓存粒度是单关键词，而不是整个批次任务。
+缓存粒度是单关键词。
 
 ```text
 cache_key = sha256(category + normalized_keyword + normalized_info)
@@ -327,7 +338,7 @@ cache_key = sha256(category + normalized_keyword + normalized_info)
 
 这意味着：
 
-- 多关键词任务会拆成多个独立缓存单元
+- 每次任务只处理一个关键词
 - 如果 `category + keyword + info` 完全一致，会直接返回缓存结果
 - 相同词但品牌信息不同，会视为不同生成结果
 
@@ -338,7 +349,7 @@ cache_key = sha256(category + normalized_keyword + normalized_info)
 项目内置了一个更接近 `site-geo` 风格的 FastAPI 模板 console 页面，由 `app/web/templates/` + `app/web/static/` 资源驱动，支持：
 
 - 选择 `SEO / GEO`
-- 输入多关键词
+- 输入单个关键词
 - 输入品牌 / 产品信息
 - 先用 access key 兑换 1 天 bearer token
 - 控制封面图开关和正文图数量 `0-3`
@@ -348,6 +359,8 @@ cache_key = sha256(category + normalized_keyword + normalized_info)
 - 预览最终 HTML
 - 预览封面图与正文配图
 - 直接查看 API 调用示例和启动命令
+
+MySQL 初始化 SQL 文件位于 [database/mysql_schema.sql](/Users/berry-zhang/workspace/site-seo-geo-article/database/mysql_schema.sql)，可以直接执行它来创建数据库和两张核心表。模板版本位于 [database/mysql_schema.template.sql](/Users/berry-zhang/workspace/site-seo-geo-article/database/mysql_schema.template.sql)，程序启动时会用它自动建表。
 
 ---
 

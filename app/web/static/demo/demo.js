@@ -16,6 +16,36 @@ document.addEventListener("DOMContentLoaded", () => {
   let pollTimer = null;
   let accessToken = "";
 
+  async function requestJson(url, options = {}) {
+    try {
+      const response = await fetch(url, options);
+      const rawText = await response.text();
+      let data = null;
+      try {
+        data = rawText ? JSON.parse(rawText) : {};
+      } catch {
+        data = {
+          success: false,
+          message: rawText ? `Non-JSON response: ${rawText.slice(0, 180)}` : "Empty response body",
+        };
+      }
+      return {
+        ok: response.ok,
+        status: response.status,
+        data,
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        status: 0,
+        data: {
+          success: false,
+          message: error?.message || "Network request failed",
+        },
+      };
+    }
+  }
+
   function escapeHtml(value) {
     return String(value || "")
       .replaceAll("&", "&amp;")
@@ -97,22 +127,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
     renderSummary(task.progress);
     apiJson.textContent = JSON.stringify(task, null, 2);
-    const items = task.items || [];
+    const article = task.article || {};
 
-    if (!items.length) {
-      results.innerHTML = '<div class="empty">No task items returned.</div>';
+    if (!article.title) {
+      results.innerHTML = '<div class="empty">No article result is available for this task yet.</div>';
       return;
     }
 
-    results.innerHTML = items
-      .map((item) => {
-        const article = item.article || {};
-        const statusClass =
-          item.status === "failed" ? "pill-failed" : item.status === "completed" ? "pill-done" : "";
-        const previewHtml = article.html ? article.html : "<p>Waiting for article output...</p>";
-        const images = Array.isArray(article.images) ? article.images : [];
-        const galleryHtml = images.length
-          ? `
+    const statusClass =
+      task.status === "failed" ? "pill-failed" : task.status === "completed" ? "pill-done" : "";
+    const previewHtml = article.html ? article.html : "<p>Waiting for article output...</p>";
+    const images = Array.isArray(article.images) ? article.images : [];
+    const galleryHtml = images.length
+      ? `
           <div class="gallery">
             ${images
               .map(
@@ -129,64 +156,56 @@ document.addEventListener("DOMContentLoaded", () => {
               .join("")}
           </div>
         `
-          : "";
+      : "";
 
-        return `
-          <article class="result-card">
-            <div class="result-head">
-              <div>
-                <h3>${escapeHtml(item.keyword)}</h3>
-                <div class="result-meta">
-                  <span class="pill ${statusClass}">${escapeHtml(item.status)}</span>
-                  ${item.cache_hit ? '<span class="pill pill-cache">cache hit</span>' : ""}
-                  ${article.generation_mode ? `<span class="pill">${escapeHtml(article.generation_mode)}</span>` : ""}
-                  ${
-                    article.image_generation_mode
-                      ? `<span class="pill">${escapeHtml(article.image_generation_mode)} images</span>`
-                      : ""
-                  }
-                  ${task.access_tier ? `<span class="pill">${escapeHtml(task.access_tier)} access</span>` : ""}
-                </div>
-              </div>
+    results.innerHTML = `
+      <article class="result-card">
+        <div class="result-head">
+          <div>
+            <h3>${escapeHtml(task.keyword)}</h3>
+            <div class="result-meta">
+              <span class="pill ${statusClass}">${escapeHtml(task.status)}</span>
+              ${task.cache_hit ? '<span class="pill pill-cache">cache hit</span>' : ""}
+              ${article.generation_mode ? `<span class="pill">${escapeHtml(article.generation_mode)}</span>` : ""}
+              ${
+                article.image_generation_mode
+                  ? `<span class="pill">${escapeHtml(article.image_generation_mode)} images</span>`
+                  : ""
+              }
+              ${task.access_tier ? `<span class="pill">${escapeHtml(task.access_tier)} access</span>` : ""}
             </div>
-            ${item.error ? `<p class="muted" style="color:#b91c1c">${escapeHtml(item.error)}</p>` : ""}
-            ${
-              article.title
-                ? `
-              <div class="article-meta">
-                <div><strong>Title:</strong> ${escapeHtml(article.title)}</div>
-                <div><strong>Meta Title:</strong> ${escapeHtml(article.meta_title)}</div>
-                <div><strong>Meta Description:</strong> ${escapeHtml(article.meta_description)}</div>
-              </div>
-              <div class="result-tabs">
-                <div class="result-tab-buttons">
-                  <button class="result-tab-button active" type="button" data-tab="preview">Preview</button>
-                  <button class="result-tab-button" type="button" data-tab="html">View HTML</button>
-                </div>
-                <div class="result-tab-panel active" data-panel="preview">
-                  <div class="preview-surface">${previewHtml}</div>
-                </div>
-                <div class="result-tab-panel" data-panel="html">
-                  <pre class="code-block">${escapeHtml(article.html)}</pre>
-                </div>
-              </div>
-              ${galleryHtml}
-            `
-                : '<div class="muted">Waiting for article output...</div>'
-            }
-          </article>
-        `;
-      })
-      .join("");
+          </div>
+        </div>
+        ${task.error_message ? `<p class="muted" style="color:#b91c1c">${escapeHtml(task.error_message)}</p>` : ""}
+        <div class="article-meta">
+          <div><strong>Title:</strong> ${escapeHtml(article.title)}</div>
+          <div><strong>Meta Title:</strong> ${escapeHtml(article.meta_title)}</div>
+          <div><strong>Meta Description:</strong> ${escapeHtml(article.meta_description)}</div>
+        </div>
+        <div class="result-tabs">
+          <div class="result-tab-buttons">
+            <button class="result-tab-button active" type="button" data-tab="preview">Preview</button>
+            <button class="result-tab-button" type="button" data-tab="html">View HTML</button>
+          </div>
+          <div class="result-tab-panel active" data-panel="preview">
+            <div class="preview-surface">${previewHtml}</div>
+          </div>
+          <div class="result-tab-panel" data-panel="html">
+            <pre class="code-block">${escapeHtml(article.html)}</pre>
+          </div>
+        </div>
+        ${galleryHtml}
+      </article>
+    `;
 
     bindResultTabs();
   }
 
   async function fetchTask(taskId) {
-    const response = await fetch(`/api/tasks/${taskId}`, {
+    const result = await requestJson(`/api/tasks/${taskId}`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
-    const payload = await response.json();
+    const payload = result.data || {};
 
     if (!payload.success) {
       if (["queued", "running"].includes(payload.status)) {
@@ -195,7 +214,7 @@ document.addEventListener("DOMContentLoaded", () => {
         pollTimer = setTimeout(() => fetchTask(taskId), 1500);
         return;
       }
-      taskMeta.textContent = payload.message || "Task lookup failed";
+      taskMeta.textContent = payload.message || `Task lookup failed (${result.status || "network"})`;
       apiJson.textContent = JSON.stringify(payload, null, 2);
       resetTaskUi(taskMeta.textContent);
       return;
@@ -222,12 +241,12 @@ document.addEventListener("DOMContentLoaded", () => {
       access_key: formData.get("access_key"),
     };
 
-    const response = await fetch("/api/token", {
+    const result = await requestJson("/api/token", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    const data = await response.json();
+    const data = result.data || {};
     apiJson.textContent = JSON.stringify(data, null, 2);
 
     if (!data.success) {
@@ -268,7 +287,7 @@ document.addEventListener("DOMContentLoaded", () => {
           </div>
           <div class="generation-copy">
             <strong>Generating content now</strong>
-            <div class="generation-subtitle">Analyzing keywords, building strategy, drafting HTML, and preparing requested visuals.</div>
+            <div class="generation-subtitle">Analyzing the keyword, building strategy, drafting HTML, and preparing requested visuals.</div>
           </div>
           <div class="generation-steps">
             <div class="generation-step"><span class="generation-dot"></span><span>Intent and outline planning</span></div>
@@ -291,14 +310,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const payload = {
       category: formData.get("category"),
       language: formData.get("language"),
-      keywords: formData.get("keywords"),
+      keyword: formData.get("keyword"),
       info: formData.get("info"),
       force_refresh: formData.get("force_refresh") === "true",
       include_cover: Number(formData.get("include_cover") || 1),
       content_image_count: Number(formData.get("content_image_count") || 3),
     };
 
-    const response = await fetch("/api/tasks", {
+    const result = await requestJson("/api/tasks", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -306,10 +325,10 @@ document.addEventListener("DOMContentLoaded", () => {
       },
       body: JSON.stringify(payload),
     });
-    const data = await response.json();
+    const data = result.data || {};
 
     if (!data.success) {
-      taskMeta.textContent = data.message || "Task creation failed";
+      taskMeta.textContent = data.message || `Task creation failed (${result.status || "network"})`;
       results.innerHTML = '<div class="empty">The request could not be processed.</div>';
       apiJson.textContent = JSON.stringify(data, null, 2);
       resetTaskUi(taskMeta.textContent);

@@ -12,6 +12,19 @@ def issue_token(client: TestClient) -> dict:
     return response.json()["data"]
 
 
+def wait_for_task_completion(client: TestClient, bearer: dict[str, str], task_id: int, timeout: float = 5.0) -> dict:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        task_response = client.get(f"/api/tasks/{task_id}", headers=bearer)
+        assert task_response.status_code == 200
+        body = task_response.json()
+        if body.get("success") is False and body.get("status") in {"queued", "running"}:
+            time.sleep(0.1)
+            continue
+        return body["data"]
+    raise AssertionError("task did not finish within timeout")
+
+
 def test_create_task_and_fetch_result(tmp_path: Path) -> None:
     app = create_app(
         {
@@ -29,7 +42,7 @@ def test_create_task_and_fetch_result(tmp_path: Path) -> None:
         "/api/tasks",
         json={
             "category": "geo",
-            "keywords": ["portable charger on plane"],
+            "keyword": "portable charger on plane",
             "info": "Brand: VoltGo",
         },
     )
@@ -43,7 +56,7 @@ def test_create_task_and_fetch_result(tmp_path: Path) -> None:
         headers=bearer,
         json={
             "category": "geo",
-            "keywords": ["portable charger on plane"],
+            "keyword": "portable charger on plane",
             "info": "Brand: VoltGo",
             "include_cover": 1,
             "content_image_count": 2,
@@ -53,30 +66,17 @@ def test_create_task_and_fetch_result(tmp_path: Path) -> None:
     task_id = create_response.json()["data"]["task_id"]
     assert create_response.json()["data"]["access_tier"] == "vip"
 
-    deadline = time.time() + 5
-    status = None
-    task_payload = None
-    while time.time() < deadline:
-        task_response = client.get(f"/api/tasks/{task_id}", headers=bearer)
-        assert task_response.status_code == 200
-        body = task_response.json()
-        if body.get("success") is False and body.get("status") in {"queued", "running"}:
-            time.sleep(0.1)
-            continue
-        task_payload = body["data"]
-        status = task_payload["status"]
-        if status in {"completed", "failed", "partial_failed"}:
-            break
-        time.sleep(0.1)
-
+    task_payload = wait_for_task_completion(client, bearer, task_id)
+    status = task_payload["status"]
     assert status == "completed"
     assert task_payload is not None
     assert task_payload["access_tier"] == "vip"
-    assert task_payload["items"][0]["article"]["generation_mode"] == "mock"
-    assert len(task_payload["items"][0]["article"]["images"]) == 3
-    assert task_payload["items"][0]["article"]["cover_image"] is not None
-    assert len(task_payload["items"][0]["article"]["content_images"]) == 2
-    assert task_payload["items"][0]["article"]["images"][0]["data_url"].startswith("data:image/")
+    assert task_payload["keyword"] == "portable charger on plane"
+    assert task_payload["article"]["generation_mode"] == "mock"
+    assert len(task_payload["article"]["images"]) == 3
+    assert task_payload["article"]["cover_image"] is not None
+    assert len(task_payload["article"]["content_images"]) == 2
+    assert task_payload["article"]["images"][0]["data_url"].startswith("data:image/")
 
 
 def test_task_can_disable_cover_and_content_images(tmp_path: Path) -> None:
@@ -99,7 +99,7 @@ def test_task_can_disable_cover_and_content_images(tmp_path: Path) -> None:
         headers=bearer,
         json={
             "category": "seo",
-            "keywords": ["best usb c charger"],
+            "keyword": "best usb c charger",
             "info": "Brand: VoltGo",
             "include_cover": 0,
             "content_image_count": 0,
@@ -108,24 +108,40 @@ def test_task_can_disable_cover_and_content_images(tmp_path: Path) -> None:
     assert create_response.status_code == 200
     task_id = create_response.json()["data"]["task_id"]
 
-    deadline = time.time() + 5
-    while time.time() < deadline:
-        task_response = client.get(f"/api/tasks/{task_id}", headers=bearer)
-        assert task_response.status_code == 200
-        body = task_response.json()
-        if body.get("success") is False and body.get("status") in {"queued", "running"}:
-            time.sleep(0.1)
-            continue
-        task_payload = body["data"]
-        if task_payload["status"] in {"completed", "failed", "partial_failed"}:
-            break
-        time.sleep(0.1)
+    task_payload = wait_for_task_completion(client, bearer, task_id)
 
-    article = task_payload["items"][0]["article"]
+    article = task_payload["article"]
     assert article["images"] == []
     assert article["cover_image"] is None
     assert article["content_images"] == []
     assert article["image_generation_mode"] == "disabled"
+
+
+def test_create_task_requires_keyword_field(tmp_path: Path) -> None:
+    app = create_app(
+        {
+            "data_dir": tmp_path,
+            "llm_mock_mode": True,
+            "openai_api_key": "",
+            "normal_access_key": "test-standard-key",
+            "vip_access_key": "test-vip-key",
+            "token_signing_secret": "test-signing-secret",
+        }
+    )
+    client = TestClient(app)
+    token_data = issue_token(client)
+    bearer = {"Authorization": f"Bearer {token_data['access_token']}"}
+
+    create_response = client.post(
+        "/api/tasks",
+        headers=bearer,
+        json={
+            "category": "seo",
+            "keywords": ["best usb c charger"],
+            "info": "Brand: VoltGo",
+        },
+    )
+    assert create_response.status_code == 422
 
 
 def test_get_task_returns_false_while_running(tmp_path: Path) -> None:
@@ -155,7 +171,7 @@ def test_get_task_returns_false_while_running(tmp_path: Path) -> None:
         headers=bearer,
         json={
             "category": "seo",
-            "keywords": ["best usb c charger"],
+            "keyword": "best usb c charger",
             "info": "Brand: VoltGo",
             "include_cover": 0,
             "content_image_count": 0,
@@ -170,6 +186,72 @@ def test_get_task_returns_false_while_running(tmp_path: Path) -> None:
     assert payload["success"] is False
     assert payload["message"] == "task not completed"
     assert payload["status"] in {"queued", "running"}
+
+
+def test_reuse_existing_task_when_force_refresh_is_false(tmp_path: Path) -> None:
+    app = create_app(
+        {
+            "data_dir": tmp_path,
+            "llm_mock_mode": True,
+            "openai_api_key": "",
+            "normal_access_key": "test-standard-key",
+            "vip_access_key": "test-vip-key",
+            "token_signing_secret": "test-signing-secret",
+        }
+    )
+    client = TestClient(app)
+    token_data = issue_token(client)
+    bearer = {"Authorization": f"Bearer {token_data['access_token']}"}
+
+    first_response = client.post(
+        "/api/tasks",
+        headers=bearer,
+        json={
+            "category": "seo",
+            "keyword": "best usb c charger",
+            "info": "Brand: VoltGo",
+            "language": "English",
+            "include_cover": 0,
+            "content_image_count": 0,
+        },
+    )
+    assert first_response.status_code == 200
+    first_task_id = first_response.json()["data"]["task_id"]
+    first_task = wait_for_task_completion(client, bearer, first_task_id)
+    assert first_task["status"] == "completed"
+
+    second_response = client.post(
+        "/api/tasks",
+        headers=bearer,
+        json={
+            "category": "seo",
+            "keyword": "best usb c charger",
+            "info": "Brand: VoltGo",
+            "language": "English",
+            "include_cover": 1,
+            "content_image_count": 3,
+            "force_refresh": False,
+        },
+    )
+    assert second_response.status_code == 200
+    second_payload = second_response.json()["data"]
+    assert second_payload["task_id"] == first_task_id
+    assert second_payload["status"] == "completed"
+
+    third_response = client.post(
+        "/api/tasks",
+        headers=bearer,
+        json={
+            "category": "seo",
+            "keyword": "best usb c charger",
+            "info": "Brand: VoltGo",
+            "language": "English",
+            "force_refresh": True,
+        },
+    )
+    assert third_response.status_code == 200
+    third_task_id = third_response.json()["data"]["task_id"]
+    assert third_task_id != first_task_id
 
 
 def test_index_renders_token_and_task_console(tmp_path: Path) -> None:
@@ -213,3 +295,58 @@ def test_openapi_only_exposes_task_endpoints(tmp_path: Path) -> None:
     assert response.status_code == 200
     paths = response.json()["paths"]
     assert set(paths.keys()) == {"/api/token", "/api/tasks", "/api/tasks/{task_id}"}
+
+
+def test_create_task_returns_json_when_service_fails(tmp_path: Path) -> None:
+    app = create_app(
+        {
+            "data_dir": tmp_path,
+            "llm_mock_mode": True,
+            "openai_api_key": "",
+            "normal_access_key": "test-standard-key",
+            "vip_access_key": "test-vip-key",
+            "token_signing_secret": "test-signing-secret",
+        }
+    )
+    client = TestClient(app)
+    token_data = issue_token(client)
+    bearer = {"Authorization": f"Bearer {token_data['access_token']}"}
+    app.state.services.task_service.create_task = lambda **_: (_ for _ in ()).throw(RuntimeError("db down"))
+
+    response = client.post(
+        "/api/tasks",
+        headers=bearer,
+        json={
+            "category": "seo",
+            "keyword": "best usb c charger",
+            "info": "Brand: VoltGo",
+        },
+    )
+    assert response.status_code == 503
+    payload = response.json()
+    assert payload["success"] is False
+    assert payload["message"] == "task service is temporarily unavailable"
+
+
+def test_get_task_returns_json_when_service_fails(tmp_path: Path) -> None:
+    app = create_app(
+        {
+            "data_dir": tmp_path,
+            "llm_mock_mode": True,
+            "openai_api_key": "",
+            "normal_access_key": "test-standard-key",
+            "vip_access_key": "test-vip-key",
+            "token_signing_secret": "test-signing-secret",
+        }
+    )
+    client = TestClient(app)
+    token_data = issue_token(client)
+    bearer = {"Authorization": f"Bearer {token_data['access_token']}"}
+    app.state.services.task_service.get_task = lambda *_: (_ for _ in ()).throw(RuntimeError("db down"))
+
+    response = client.get("/api/tasks/1", headers=bearer)
+    assert response.status_code == 503
+    payload = response.json()
+    assert payload["success"] is False
+    assert payload["message"] == "task service is temporarily unavailable"
+    assert payload["status"] == "error"

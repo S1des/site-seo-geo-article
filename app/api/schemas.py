@@ -24,10 +24,7 @@ class TokenExchangeResponse(BaseModel):
 
 class TaskCreateRequest(BaseModel):
     category: str = Field(..., examples=["seo"])
-    keywords: list[str] | str = Field(
-        ...,
-        examples=[["portable charger on plane", "tsa power bank rules"]],
-    )
+    keyword: str = Field(..., examples=["portable charger on plane"])
     info: str = ""
     brand_info: str = ""
     language: str = "English"
@@ -39,7 +36,7 @@ class TaskCreateRequest(BaseModel):
         "json_schema_extra": {
             "example": {
                 "category": "seo",
-                "keywords": ["portable charger on plane", "tsa power bank rules"],
+                "keyword": "portable charger on plane",
                 "info": "Brand: VoltGo. Product: 20000mAh portable charger.",
                 "language": "English",
                 "force_refresh": False,
@@ -51,7 +48,7 @@ class TaskCreateRequest(BaseModel):
 
 
 class TaskAcceptedData(BaseModel):
-    task_id: str
+    task_id: int
     status: str
     access_tier: str
 
