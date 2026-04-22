@@ -4,7 +4,7 @@ from typing import Any
 
 
 def build_demo_page_context(
-    *, llm_enabled: bool, image_enabled: bool, image_mode: str
+    *, llm_enabled: bool, image_enabled: bool, image_mode: str, page_title: str, active_demo: str
 ) -> dict[str, Any]:
     llm_label = "Live LLM" if llm_enabled else "Mock Mode"
     llm_badge_class = "badge-live" if llm_enabled else "badge-mock"
@@ -22,7 +22,7 @@ def build_demo_page_context(
     )
 
     return {
-        "page_title": "SEO / GEO Article Writer Console",
+        "page_title": page_title,
         "llm_label": llm_label,
         "llm_badge_class": llm_badge_class,
         "llm_tip": llm_tip,
@@ -30,4 +30,5 @@ def build_demo_page_context(
         "image_badge_class": image_badge_class,
         "image_tip": image_tip,
         "image_mode": image_mode,
+        "active_demo": active_demo,
     }

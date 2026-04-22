@@ -431,6 +431,46 @@ def test_list_tasks_returns_recent_entries_in_desc_order(tmp_path: Path) -> None
     assert tasks[0]["status"] == "completed"
 
 
+def test_generate_outline_returns_outline_suggestions_and_links(tmp_path: Path) -> None:
+    app = create_app(
+        {
+            "data_dir": tmp_path,
+            "llm_mock_mode": True,
+            "openai_api_key": "",
+            "normal_access_key": "test-standard-key",
+            "vip_access_key": "test-vip-key",
+            "token_signing_secret": "test-signing-secret",
+        }
+    )
+    client = TestClient(app)
+    token_data = issue_token(client)
+    bearer = {"Authorization": f"Bearer {token_data['access_token']}"}
+
+    response = client.post(
+        "/api/outline",
+        headers=bearer,
+        json={
+            "category": "geo",
+            "keyword": "Welke thuisbatterij heeft de beste app",
+            "site_url": "https://www.ankersolix.com/nl",
+            "product_urls": [
+                "https://www.ankersolix.com/nl/plug-and-play-thuisbatterij/thuisbatterij-a17e2?ref=naviMenu_4_copy",
+                "https://www.ankersolix.com/nl/products/a17c5",
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["success"] is True
+    data = payload["data"]
+    assert data["generation_mode"] == "mock"
+    assert "Quick Answer" in data["outline_markdown"]
+    assert len(data["writing_suggestions"]) >= 3
+    assert len(data["recommended_internal_links"]) >= 2
+    assert data["recommended_internal_links"][0]["url"].startswith("https://www.ankersolix.com/nl")
+
+
 def test_task_context_changes_cache_scope_and_adds_disclaimer(tmp_path: Path) -> None:
     app = create_app(
         {
@@ -519,6 +559,31 @@ def test_index_renders_token_and_task_console(tmp_path: Path) -> None:
     assert "/api/tasks" in html
     assert "/api/token" in html
     assert "Recent Tasks" in html
+    assert "Outline Demo" in html
+
+
+def test_outline_page_renders_outline_console(tmp_path: Path) -> None:
+    app = create_app(
+        {
+            "data_dir": tmp_path,
+            "llm_mock_mode": True,
+            "openai_api_key": "",
+            "normal_access_key": "test-standard-key",
+            "vip_access_key": "test-vip-key",
+            "token_signing_secret": "test-signing-secret",
+        }
+    )
+    client = TestClient(app)
+
+    response = client.get("/outline")
+    assert response.status_code == 200
+
+    html = response.text
+    assert "SEO / GEO Outline Writer" in html
+    assert "Official Site URL" in html
+    assert "Product URLs" in html
+    assert "/api/outline" in html
+    assert "Article Demo" in html
 
 
 def test_openapi_only_exposes_task_endpoints(tmp_path: Path) -> None:
@@ -537,7 +602,7 @@ def test_openapi_only_exposes_task_endpoints(tmp_path: Path) -> None:
     response = client.get("/openapi.json")
     assert response.status_code == 200
     paths = response.json()["paths"]
-    assert set(paths.keys()) == {"/api/token", "/api/tasks", "/api/tasks/{task_id}"}
+    assert set(paths.keys()) == {"/api/token", "/api/outline", "/api/tasks", "/api/tasks/{task_id}"}
 
 
 def test_openapi_exposes_bearer_security_scheme(tmp_path: Path) -> None:

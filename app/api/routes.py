@@ -10,6 +10,9 @@ from app.core.runtime import AppServices
 from app.services.task_service import FINAL_STATUSES
 from .schemas import (
     ErrorResponse,
+    OutlineCreateRequest,
+    OutlineData,
+    OutlineResponse,
     TaskAcceptedData,
     TaskCreateRequest,
     TaskCreateResponse,
@@ -54,6 +57,71 @@ def create_api_router(services: AppServices) -> APIRouter:
                 content={"success": False, "message": "valid access key is required"},
             )
         return TokenExchangeResponse(data=TokenExchangeData(**issued))
+
+    @router.post(
+        "/outline",
+        tags=["tasks"],
+        response_model=OutlineResponse,
+        responses={400: {"model": ErrorResponse}, 401: {"model": ErrorResponse}},
+        summary="Generate a synchronous SEO or GEO article outline",
+    )
+    async def create_outline(
+        payload: OutlineCreateRequest,
+        authorization: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    ) -> OutlineResponse | JSONResponse:
+        category = payload.category.strip().lower()
+        keyword = payload.keyword.strip()
+        site_url = payload.site_url.strip()
+        product_urls = [item.strip() for item in payload.product_urls if item.strip()]
+        provider = (payload.provider or "openai").strip().lower()
+        auth_payload = resolve_auth_payload(services, authorization)
+
+        if category not in {"seo", "geo"}:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"success": False, "message": "category must be seo or geo"},
+            )
+
+        if not auth_payload:
+            return JSONResponse(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                content={"success": False, "message": "valid bearer token is required"},
+            )
+
+        if not keyword or not site_url:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"success": False, "message": "keyword and site_url are required"},
+            )
+
+        if provider not in {"openai", "anthropic"}:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"success": False, "message": "provider must be openai or anthropic"},
+            )
+
+        try:
+            outline = services.outline_service.generate(
+                category=category,
+                keyword=keyword,
+                site_url=site_url,
+                product_urls=product_urls,
+                provider=provider,
+                access_tier=auth_payload["tier"],
+            )
+        except ValueError as exc:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"success": False, "message": str(exc)},
+            )
+        except Exception:
+            logger.exception("Outline service unavailable while generating an outline.")
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={"success": False, "message": "outline service is temporarily unavailable"},
+            )
+
+        return OutlineResponse(data=OutlineData(**outline))
 
     @router.post(
         "/tasks",

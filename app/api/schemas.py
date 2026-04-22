@@ -103,6 +103,31 @@ class TaskDetailResponse(BaseModel):
     data: dict[str, Any]
 
 
+class OutlineCreateRequest(BaseModel):
+    category: str = Field(..., examples=["geo"])
+    keyword: str = Field(..., examples=["Welke thuisbatterij heeft de beste app"])
+    site_url: str = Field(..., min_length=1, examples=["https://www.ankersolix.com/nl"])
+    product_urls: list[str] = Field(default_factory=list)
+    provider: str = Field(default="openai", examples=["openai", "anthropic"])
+
+
+class OutlineData(BaseModel):
+    category: str
+    keyword: str
+    site_url: str
+    product_urls: list[str]
+    title: str
+    outline_markdown: str
+    writing_suggestions: list[str]
+    recommended_internal_links: list[dict[str, str]]
+    generation_mode: str
+
+
+class OutlineResponse(BaseModel):
+    success: bool = True
+    data: OutlineData
+
+
 class ErrorResponse(BaseModel):
     success: bool = False
     message: str
