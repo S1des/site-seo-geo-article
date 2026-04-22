@@ -1,0 +1,124 @@
+{
+  "global": {
+    "meta_title_limit": 60,
+    "meta_description_limit": 160,
+    "banned_terms": {
+      "AI-powered": "smart",
+      "AI algorithm": "smart control logic",
+      "AI control": "smart control",
+      "AI technology": "smart technology",
+      "AI": "smart"
+    }
+  },
+  "category_rules": {
+    "seo": {
+      "required_sections": ["Conclusion", "FAQ"],
+      "writing_goals": [
+        "align title and meta with search intent",
+        "keep paragraphs compact and scannable",
+        "support the article with natural internal links"
+      ]
+    },
+    "geo": {
+      "required_sections": ["Quick Answer", "References", "FAQ"],
+      "writing_goals": [
+        "place a direct answer in the first screen",
+        "make headings easy to quote or summarize",
+        "show proof types and trust signals clearly"
+      ]
+    }
+  },
+  "market_rules": {
+    "eu": {
+      "requires_shopify_link": true,
+      "early_product_placement": true,
+      "notes": [
+        "Add at least one product-page style internal link within the first two paragraphs when a valid URL is provided."
+      ]
+    },
+    "row": {
+      "avoid_year_in_title": true,
+      "use_static_product_links": true
+    }
+  },
+  "country_rules": {
+    "de": {
+      "market": "eu",
+      "locale_variant": "de-DE",
+      "internal_link_targets": [
+        {
+          "label": "Bkw 800 watt",
+          "url": "https://de.ecoflow.com/collections/balkonkraftwerk-800-watt"
+        },
+        {
+          "label": "800 watt inverter",
+          "url": "https://de.ecoflow.com/products/stream-microinverter"
+        },
+        {
+          "label": "Mehrwertsteuer",
+          "url": "https://www.ecoflow.com/de/blog/pv-anlage-mehrwertsteuer-2026"
+        }
+      ]
+    },
+    "ph": {
+      "locale_variant": "en-US"
+    },
+    "za": {
+      "market": "row",
+      "locale_variant": "en-GB"
+    },
+    "au": {
+      "market": "row",
+      "locale_variant": "en-GB"
+    },
+    "uk": {
+      "market": "eu",
+      "locale_variant": "en-GB"
+    },
+    "ca": {
+      "locale_variant": "en-GB"
+    }
+  },
+  "article_type_rules": {
+    "policy_incentive": {
+      "required_disclaimer": "Before reading this guidance, please note that government programs such as rebates, bonuses, and tax credits can vary based on individual circumstances, eligibility criteria, and policy changes. EcoFlow does not provide any assurances or guarantees concerning potential financial incentives associated with our products. Any information in this guidance is provided solely for educational purposes and shall not be construed as legal, tax, or financial advice. We recommend you consult official program guidelines or seek advice from qualified professionals for accurate and personalized information."
+    },
+    "appliance_rebate": {
+      "required_disclaimer": "Before reading this guidance, please note that rebate programs can vary based on individual circumstances, location, and eligibility criteria. EcoFlow does not provide any assurances or guarantees concerning potential rebates associated with our products. Any information in this guidance is solely for educational purposes and shall not be construed as legal or financial advice. We recommend you consult the official program guidelines or seek professional advice for accurate and personalized information."
+    },
+    "competitor_comparison": {
+      "required_disclaimer": "The brands referenced in this article are provided for informational purposes only and do not indicate any partnership with EcoFlow."
+    },
+    "natural_disaster": {
+      "notes": [
+        "Avoid implying real-time coverage. Keep the tone practical and reassuring."
+      ]
+    }
+  },
+  "product_rules": {
+    "stream": {
+      "required_note": "STREAM microinverters are not compatible with PPS battery devices outside the STREAM family.",
+      "image_notes": [
+        "Ensure product visuals and plugs match the target market."
+      ]
+    },
+    "delta_3_max": {
+      "notes": [
+        "Keep capacity and output power separate, and verify expansion claims against official comparison tables."
+      ]
+    },
+    "delta_3_max_plus": {
+      "priority": 1,
+      "notes": [
+        "Prefer DELTA 3 Max Plus ahead of DELTA 3 Max when both are recommended in EU markets."
+      ]
+    },
+    "wave_3": {
+      "country_overrides": {
+        "za": {
+          "required_note": "Please note: The add-on battery should be purchased separately for off-grid use."
+        }
+      }
+    }
+  }
+}
