@@ -82,6 +82,7 @@ def test_serialize_task_row_handles_missing_optional_fields() -> None:
 
     assert payload["task_id"] == 2
     assert payload["language"] == "English"
+    assert payload["task_context"] == {}
     assert payload["include_cover"] == 1
     assert payload["content_image_count"] == 0
     assert payload["status"] == "queued"

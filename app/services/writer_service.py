@@ -3,6 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
+from app.services.article_validator import ArticleValidator
 from app.services.image_service import ImageService
 from app.services.llm_client import LLMClient
 from app.services.prompt_builder import (
@@ -10,13 +11,22 @@ from app.services.prompt_builder import (
     build_polish_prompt,
     build_strategy_prompt,
 )
+from app.services.rulebook_service import RulebookService
 from app.utils.common import extract_json_object, slugify, truncate
 
 
 class WriterService:
-    def __init__(self, llm_client: LLMClient, image_service: ImageService | None = None) -> None:
+    def __init__(
+        self,
+        llm_client: LLMClient,
+        image_service: ImageService | None = None,
+        rulebook_service: RulebookService | None = None,
+        article_validator: ArticleValidator | None = None,
+    ) -> None:
         self.llm_client = llm_client
         self.image_service = image_service
+        self.rulebook_service = rulebook_service or RulebookService()
+        self.article_validator = article_validator or ArticleValidator()
 
     def generate(
         self,
@@ -25,6 +35,7 @@ class WriterService:
         category: str,
         keyword: str,
         info: str,
+        task_context: dict[str, Any] | None = None,
         language: str = "English",
         provider: str = "openai",
         word_limit: int = 1200,
@@ -33,8 +44,15 @@ class WriterService:
         content_image_count: int = 3,
     ) -> dict[str, Any]:
         normalized_word_limit = max(200, int(word_limit))
+        normalized_context = self.rulebook_service.normalize_task_context(task_context)
+        rule_context = self.rulebook_service.resolve_rules(
+            category=category,
+            language=language,
+            task_context=normalized_context,
+        )
+
         if self.llm_client.enabled(provider):
-            strategy_prompt = build_strategy_prompt(category, keyword, info, language)
+            strategy_prompt = build_strategy_prompt(category, keyword, info, language, rule_context)
             raw_strategy = self.llm_client.complete(
                 strategy_prompt,
                 expect_json=True,
@@ -49,6 +67,7 @@ class WriterService:
                 info,
                 language,
                 strategy,
+                rule_context,
                 normalized_word_limit,
             )
             draft_html = self.llm_client.complete(draft_prompt, access_tier=access_tier, provider=provider)
@@ -58,6 +77,7 @@ class WriterService:
                 language,
                 keyword,
                 draft_html,
+                rule_context,
                 normalized_word_limit,
             )
             polished_html = self.llm_client.complete(polish_prompt, access_tier=access_tier, provider=provider)
@@ -66,28 +86,29 @@ class WriterService:
                 category=category,
                 keyword=keyword,
                 info=info,
+                task_context=normalized_context,
                 language=language,
                 strategy=strategy,
+                rule_context=rule_context,
                 html=polished_html.strip(),
                 generation_mode="llm",
                 word_limit=normalized_word_limit,
             )
-            return self._attach_images(
-                asset_namespace=asset_namespace,
-                article=article,
+        else:
+            article = self._mock_article(
                 category=category,
                 keyword=keyword,
                 info=info,
-                include_cover=include_cover,
-                content_image_count=content_image_count,
+                task_context=normalized_context,
+                language=language,
+                word_limit=normalized_word_limit,
             )
 
-        article = self._mock_article(
+        article = self.article_validator.apply(
+            article,
             category=category,
             keyword=keyword,
-            info=info,
-            language=language,
-            word_limit=normalized_word_limit,
+            rule_context=rule_context,
         )
         return self._attach_images(
             asset_namespace=asset_namespace,
@@ -167,8 +188,10 @@ class WriterService:
         category: str,
         keyword: str,
         info: str,
+        task_context: dict[str, Any] | None,
         language: str,
         strategy: dict[str, Any],
+        rule_context: dict[str, Any],
         html: str,
         generation_mode: str,
         word_limit: int,
@@ -182,17 +205,19 @@ class WriterService:
             "category": category,
             "keyword": keyword,
             "language": language,
+            "task_context": task_context or {},
             "title": title,
-            "meta_title": truncate(strategy.get("meta_title") or title, 60),
+            "meta_title": truncate(strategy.get("meta_title") or title, int(rule_context.get("meta_title_limit", 60))),
             "meta_description": truncate(
                 strategy.get("meta_description")
                 or f"{keyword} article for {info or 'your brand'}",
-                160,
+                int(rule_context.get("meta_description_limit", 160)),
             ),
             "slug": slugify(title),
             "raw_html": html,
             "html": html,
             "strategy": strategy,
+            "rule_context": rule_context,
             "generation_mode": generation_mode,
             "word_limit": int(word_limit),
             "images": [],
@@ -207,19 +232,30 @@ class WriterService:
         category: str,
         keyword: str,
         info: str,
+        task_context: dict[str, Any] | None,
         language: str,
         word_limit: int,
     ) -> dict[str, Any]:
         brand_line = info.strip() or "Use your real brand, product facts, and proof here."
+        rule_context = self.rulebook_service.resolve_rules(
+            category=category,
+            language=language,
+            task_context=task_context,
+        )
+        internal_link = (
+            f'<a href="{rule_context["shopify_url"]}">official product page</a>'
+            if rule_context.get("shopify_url")
+            else "official product page"
+        )
 
         if category == "seo":
             strategy = {
                 "intent": "informational with commercial support",
                 "audience": "buyers researching the topic before making a decision",
-                "meta_title": truncate(f"{keyword} Guide for Better Rankings", 60),
+                "meta_title": truncate(f"{keyword} Guide for Better Rankings", int(rule_context["meta_title_limit"])),
                 "meta_description": truncate(
                     f"Learn how to write about {keyword} with a clear SEO structure, natural keyword placement, and a stronger conversion path.",
-                    160,
+                    int(rule_context["meta_description_limit"]),
                 ),
                 "h1_options": [f"{keyword}: A Practical SEO Content Guide"],
                 "outline": [
@@ -243,10 +279,13 @@ class WriterService:
                     "Anchor to buying guide or product comparison page",
                     "Anchor to documentation or category page",
                 ],
+                "compliance_notes": rule_context.get("required_notes", []),
+                "internal_link_plan": rule_context.get("resolved_internal_links", []),
             }
             html = f"""
 <h1>{strategy["h1_options"][0]}</h1>
 <p>{keyword} content performs best when it solves the reader's question immediately, keeps the structure clean, and uses product context only where it adds real value. This demo article is a scaffold, but it already follows the same three-step idea from your PHP flow: strategy first, drafting second, polishing third.</p>
+<p>When readers need specifics, send them to the {internal_link} early instead of hiding important product details until the end.</p>
 <h2>What {keyword} really means for search intent</h2>
 <p>Before writing, clarify whether the query is informational, commercial, or comparison-driven. That decision affects the article angle, the H2 structure, and even how aggressive the product mentions should be. A page that tries to do everything at once usually ends up ranking for nothing important.</p>
 <p>For most SEO workflows, the safest starting point is to answer the main question quickly, then expand with deeper sections that cover related concerns, objections, and next steps. This keeps the article useful to both search engines and real readers.</p>
@@ -277,10 +316,10 @@ class WriterService:
             strategy = {
                 "search_intent": "answer-seeking with AI citation potential",
                 "audience": "readers who want a fast answer plus proof they can trust",
-                "meta_title": truncate(f"{keyword} GEO Answer Template", 60),
+                "meta_title": truncate(f"{keyword} GEO Answer Template", int(rule_context["meta_title_limit"])),
                 "meta_description": truncate(
                     f"Use this GEO-ready article structure for {keyword} with answer-first summaries, proof blocks, references, and FAQ sections.",
-                    160,
+                    int(rule_context["meta_description_limit"]),
                 ),
                 "answer_first_summary": f"The short answer to {keyword} should appear immediately, followed by proof and references.",
                 "entity_summary": brand_line,
@@ -310,6 +349,8 @@ class WriterService:
                     "Manufacturer specifications, docs, or official product pages",
                     "Policy pages, benchmark reports, or research-backed explainers",
                 ],
+                "internal_link_plan": rule_context.get("resolved_internal_links", []),
+                "compliance_notes": rule_context.get("required_notes", []),
                 "schema_suggestions": ["Article", "FAQPage"],
                 "trust_signals": ["author byline", "publish date", "last updated", "references", "TL;DR"],
                 "image_briefs": [
@@ -319,7 +360,9 @@ class WriterService:
             }
             html = f"""
 <h1>{strategy["h1_options"][0]}</h1>
-<p><strong>TL;DR:</strong> The strongest answer to {keyword} should appear immediately, followed by concise proof, entity clarity, and visible evidence cues that make the page easier for AI systems to cite and summarize.</p>
+<h2>Quick Answer</h2>
+<p>{strategy["answer_first_summary"]}</p>
+<p>Readers who want the official version can review the {internal_link} before diving into the supporting explanation.</p>
 <h2>The direct answer to {keyword}</h2>
 <p>If the page is meant to perform in AI-driven discovery, the introduction should answer the core question first. Readers and systems alike should understand the conclusion without needing to scroll through a long setup section.</p>
 <p>That opening answer should stay consistent with the rest of the page. If brand or product claims appear later, they should reinforce the same entity story instead of introducing a new angle halfway through the article.</p>
@@ -347,17 +390,18 @@ class WriterService:
 <p>Official specs, policy pages, benchmark data, and consistent entity descriptions usually help most.</p>
 """.strip()
 
-        article = self._package_article(
+        return self._package_article(
             category=category,
             keyword=keyword,
             info=info,
+            task_context=task_context,
             language=language,
             strategy=strategy,
+            rule_context=rule_context,
             html=html,
             generation_mode="mock",
             word_limit=word_limit,
         )
-        return article
 
     def _attach_images(
         self,

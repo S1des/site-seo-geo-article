@@ -1,9 +1,51 @@
 from __future__ import annotations
 
 from textwrap import dedent
+from typing import Any
 
 
-def build_strategy_prompt(category: str, keyword: str, info: str, language: str) -> str:
+def _build_rule_brief(rule_context: dict[str, Any]) -> str:
+    context = rule_context.get("context", {})
+    notes = [
+        f"- Locale variant: {rule_context.get('locale_variant') or 'default'}",
+        f"- Required sections: {', '.join(rule_context.get('required_sections') or []) or 'none'}",
+        f"- Writing goals: {', '.join(rule_context.get('writing_goals') or []) or 'none'}",
+    ]
+    if context.get("country"):
+        notes.append(f"- Country: {context['country']}")
+    if context.get("market"):
+        notes.append(f"- Market: {context['market']}")
+    if context.get("article_type"):
+        notes.append(f"- Article type: {context['article_type']}")
+    if context.get("product_line"):
+        notes.append(f"- Product line: {context['product_line']}")
+    if context.get("topic_flags"):
+        notes.append(f"- Topic flags: {', '.join(context['topic_flags'])}")
+    if rule_context.get("required_disclaimer"):
+        notes.append("- A disclaimer block is mandatory for this article.")
+    if rule_context.get("requires_shopify_link"):
+        notes.append("- Add an internal product-page link within the first two paragraphs when a URL is provided.")
+    if rule_context.get("resolved_internal_links"):
+        links = "; ".join(f"{item['label']} -> {item['url']}" for item in rule_context["resolved_internal_links"][:3])
+        notes.append(f"- Preferred internal links: {links}")
+    if rule_context.get("required_notes"):
+        notes.append(f"- Compliance notes: {'; '.join(rule_context['required_notes'])}")
+    if rule_context.get("image_notes"):
+        notes.append(f"- Image notes: {'; '.join(rule_context['image_notes'])}")
+    if rule_context.get("banned_terms"):
+        banned = ", ".join(rule_context["banned_terms"].keys())
+        notes.append(f"- Avoid banned terms: {banned}")
+    return "\n".join(notes)
+
+
+def build_strategy_prompt(
+    category: str,
+    keyword: str,
+    info: str,
+    language: str,
+    rule_context: dict[str, Any] | None = None,
+) -> str:
+    rule_brief = _build_rule_brief(rule_context or {})
     if category == "seo":
         return dedent(
             f"""
@@ -12,6 +54,9 @@ def build_strategy_prompt(category: str, keyword: str, info: str, language: str)
 
             Brand or product information:
             {info or "None provided."}
+
+            Rule context:
+            {rule_brief}
 
             Return strict JSON only:
             {{
@@ -27,7 +72,11 @@ def build_strategy_prompt(category: str, keyword: str, info: str, language: str)
               "longtail_keywords": ["", "", "", ""],
               "faq_questions": ["", "", ""],
               "image_briefs": ["", ""],
-              "link_opportunities": ["", ""]
+              "link_opportunities": ["", ""],
+              "compliance_notes": ["", ""],
+              "internal_link_plan": [
+                {{"label": "", "placement": "", "url_hint": ""}}
+              ]
             }}
 
             Requirements:
@@ -41,7 +90,9 @@ def build_strategy_prompt(category: str, keyword: str, info: str, language: str)
               6. Titles must naturally include the main keyword
             - Outline should target a 1000-1500 word article
             - Headings should be specific, benefit-driven, and not generic
-            - Link opportunities should describe relevant anchor ideas, not fake URLs
+            - Link opportunities should describe relevant anchor ideas and use provided URLs only when available
+            - Internal link plan should call out the best early-link placement when rule context requires it
+            - Compliance notes should reflect disclaimers, compatibility notes, or banned-term constraints
             - Image briefs should describe helpful supporting visuals and mention keyword placement advice
             """
         ).strip()
@@ -53,6 +104,9 @@ def build_strategy_prompt(category: str, keyword: str, info: str, language: str)
 
         Brand or product information:
         {info or "None provided."}
+
+        Rule context:
+        {rule_brief}
 
         Return strict JSON only:
         {{
@@ -72,6 +126,10 @@ def build_strategy_prompt(category: str, keyword: str, info: str, language: str)
           ],
           "faq_questions": ["", "", ""],
           "reference_plan": ["", ""],
+          "internal_link_plan": [
+            {{"label": "", "placement": "", "url_hint": ""}}
+          ],
+          "compliance_notes": ["", ""],
           "schema_suggestions": ["Article", "FAQPage"],
           "trust_signals": ["author byline", "publish date", "last updated", "references", "TL;DR"]
         }}
@@ -90,6 +148,7 @@ def build_strategy_prompt(category: str, keyword: str, info: str, language: str)
         - Do not invent external sources; describe the type of evidence needed
         - Meta title should stay within 60 characters
         - Meta description should stay within 160 characters
+        - If internal links are required, plan them near the top of the article
         """
     ).strip()
 
@@ -100,8 +159,10 @@ def build_draft_prompt(
     info: str,
     language: str,
     strategy: dict,
+    rule_context: dict[str, Any] | None = None,
     word_limit: int = 1200,
 ) -> str:
+    rule_brief = _build_rule_brief(rule_context or {})
     if category == "seo":
         return dedent(
             f"""
@@ -113,10 +174,12 @@ def build_draft_prompt(
             Brand/Product info: {info or "None provided."}
             Strategy JSON:
             {strategy}
+            Rule context:
+            {rule_brief}
 
             Requirements:
             - Return pure HTML only
-            - Use h1, h2, h3, p, ul, li, strong tags only
+            - Use h1, h2, h3, p, ul, li, strong, a tags only
             - Structure:
               1. exact H1
               2. introduction that answers intent quickly
@@ -128,7 +191,8 @@ def build_draft_prompt(
             - Paragraphs should stay compact and readable
             - Use long-tail keywords naturally, never stuff them
             - If brand/product info is provided, integrate it naturally without turning the article into a sales page
-            - Do not invent URLs
+            - Use provided internal URLs when the strategy includes them; otherwise do not invent URLs
+            - Respect all compliance notes, disclaimers, and compatibility constraints from the rule context
             """
         ).strip()
 
@@ -142,10 +206,12 @@ def build_draft_prompt(
         Brand/Product info: {info or "None provided."}
         Strategy JSON:
         {strategy}
+        Rule context:
+        {rule_brief}
 
         Requirements:
         - Return pure HTML only
-        - Use h1, h2, h3, p, ul, li, strong tags only
+        - Use h1, h2, h3, p, ul, li, strong, a tags only
         - Structure should prioritize:
           1. H1
           2. TL;DR / answer-first intro
@@ -158,16 +224,25 @@ def build_draft_prompt(
         - Make headings easy for AI systems to quote or summarize
         - Mention citations, proof, benchmark data, or source types without inventing fake source URLs
         - If brand/product info is provided, keep entity mentions consistent and verifiable
+        - Respect all compliance notes, disclaimers, and compatibility constraints from the rule context
         """
     ).strip()
 
 
-def build_polish_prompt(category: str, language: str, keyword: str, html: str, word_limit: int = 1200) -> str:
+def build_polish_prompt(
+    category: str,
+    language: str,
+    keyword: str,
+    html: str,
+    rule_context: dict[str, Any] | None = None,
+    word_limit: int = 1200,
+) -> str:
     flavor = (
         "Improve naturalness, specificity, and SEO readability."
         if category == "seo"
         else "Improve citability, answer extraction, and trust signals."
     )
+    rule_brief = _build_rule_brief(rule_context or {})
     return dedent(
         f"""
         You are an expert editor.
@@ -180,6 +255,8 @@ def build_polish_prompt(category: str, language: str, keyword: str, html: str, w
         - Keep the article in {language}
         - Keep the keyword "{keyword}" naturally present
         - Keep textual content close to {word_limit} words/characters (excluding image content)
+        - Keep compliance with the following rule context:
+        {rule_brief}
         - Return HTML only
 
         Article:

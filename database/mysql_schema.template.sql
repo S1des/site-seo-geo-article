@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS `article_tasks` (
   `category` VARCHAR(16) NOT NULL COMMENT 'Article mode: seo or geo',
   `keyword` VARCHAR(255) NOT NULL COMMENT 'Single keyword for this task',
   `info` TEXT NOT NULL COMMENT 'Brand / product / business context',
+  `task_context_json` LONGTEXT NOT NULL COMMENT 'Normalized task context as JSON',
   `language` VARCHAR(32) NOT NULL DEFAULT 'English' COMMENT 'Requested article language',
   `provider` VARCHAR(32) NOT NULL DEFAULT 'openai' COMMENT 'LLM provider: openai or anthropic',
   `word_limit` INT UNSIGNED NOT NULL DEFAULT 1200 COMMENT 'Target text length limit (excluding image content)',

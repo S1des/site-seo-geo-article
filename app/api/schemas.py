@@ -22,6 +22,24 @@ class TokenExchangeResponse(BaseModel):
     data: TokenExchangeData
 
 
+class InternalLinkRequest(BaseModel):
+    label: str = Field(..., min_length=1, examples=["DELTA 3 Max Plus"])
+    url: str = Field(..., min_length=1, examples=["https://de.ecoflow.com/products/delta-3-max-plus"])
+
+
+class TaskContextRequest(BaseModel):
+    country: str = ""
+    market: str = ""
+    locale_variant: str = ""
+    article_type: str = ""
+    product_line: str = ""
+    topic_flags: list[str] = Field(default_factory=list)
+    mentions_other_brands: bool = False
+    requires_shopify_link: bool = False
+    shopify_url: str = ""
+    internal_links: list[InternalLinkRequest] = Field(default_factory=list)
+
+
 class TaskCreateRequest(BaseModel):
     category: str = Field(..., examples=["seo"])
     keyword: str = Field(..., examples=["portable charger on plane"])
@@ -33,6 +51,7 @@ class TaskCreateRequest(BaseModel):
     force_refresh: bool = False
     include_cover: int = Field(default=1, ge=0, le=1)
     content_image_count: int = Field(default=3, ge=0, le=3)
+    task_context: TaskContextRequest = Field(default_factory=TaskContextRequest)
 
     model_config = {
         "json_schema_extra": {
@@ -46,6 +65,14 @@ class TaskCreateRequest(BaseModel):
                 "force_refresh": False,
                 "include_cover": 1,
                 "content_image_count": 2,
+                "task_context": {
+                    "country": "de",
+                    "market": "eu",
+                    "article_type": "policy_incentive",
+                    "product_line": "stream",
+                    "requires_shopify_link": True,
+                    "shopify_url": "https://de.ecoflow.com/products/stream-microinverter",
+                },
             }
         }
     }

@@ -419,6 +419,15 @@ document.addEventListener("DOMContentLoaded", () => {
       word_limit: Number(formData.get("word_limit") || 1200),
       include_cover: Number(formData.get("include_cover") || 1),
       content_image_count: Number(formData.get("content_image_count") || 3),
+      task_context: {
+        country: formData.get("country") || "",
+        market: formData.get("market") || "",
+        article_type: formData.get("article_type") || "",
+        product_line: formData.get("product_line") || "",
+        mentions_other_brands: formData.get("mentions_other_brands") === "true",
+        requires_shopify_link: formData.get("requires_shopify_link") === "true",
+        shopify_url: formData.get("shopify_url") || "",
+      },
     };
 
     const result = await requestJson("/api/tasks", {

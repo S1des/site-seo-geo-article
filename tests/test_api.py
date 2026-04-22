@@ -66,6 +66,13 @@ def test_create_task_and_fetch_result(tmp_path: Path) -> None:
             "info": "Brand: VoltGo",
             "include_cover": 1,
             "content_image_count": 2,
+            "task_context": {
+                "country": "de",
+                "market": "eu",
+                "article_type": "policy_incentive",
+                "requires_shopify_link": True,
+                "shopify_url": "https://de.ecoflow.com/products/stream-microinverter",
+            },
         },
     )
     assert create_response.status_code == 200
@@ -79,7 +86,11 @@ def test_create_task_and_fetch_result(tmp_path: Path) -> None:
     assert task_payload["access_tier"] == "vip"
     assert task_payload["keyword"] == "portable charger on plane"
     assert task_payload["word_limit"] == 1200
+    assert task_payload["task_context"]["country"] == "de"
     assert task_payload["article"]["generation_mode"] == "mock"
+    assert task_payload["article"]["audit"]["score"] > 0
+    assert "added the required disclaimer block" in task_payload["article"]["audit"]["applied_fixes"]
+    assert "https://de.ecoflow.com/products/stream-microinverter" in task_payload["article"]["raw_html"]
     assert len(task_payload["article"]["images"]) == 3
     assert task_payload["article"]["cover_image"] is not None
     assert len(task_payload["article"]["content_images"]) == 2
@@ -419,11 +430,70 @@ def test_list_tasks_returns_recent_entries_in_desc_order(tmp_path: Path) -> None
     assert tasks[0]["progress"]["total"] == 1
     assert tasks[0]["status"] == "completed"
 
+
+def test_task_context_changes_cache_scope_and_adds_disclaimer(tmp_path: Path) -> None:
+    app = create_app(
+        {
+            "data_dir": tmp_path,
+            "llm_mock_mode": True,
+            "openai_api_key": "",
+            "normal_access_key": "test-standard-key",
+            "vip_access_key": "test-vip-key",
+            "token_signing_secret": "test-signing-secret",
+        }
+    )
+    client = TestClient(app)
+    token_data = issue_token(client)
+    bearer = {"Authorization": f"Bearer {token_data['access_token']}"}
+
+    de_response = client.post(
+        "/api/tasks",
+        headers=bearer,
+        json={
+            "category": "seo",
+            "keyword": "solar rebate guide",
+            "info": "Brand: VoltGo",
+            "include_cover": 0,
+            "content_image_count": 0,
+            "task_context": {
+                "country": "de",
+                "market": "eu",
+                "article_type": "policy_incentive",
+                "requires_shopify_link": True,
+                "shopify_url": "https://de.ecoflow.com/products/stream-microinverter",
+            },
+        },
+    )
+    au_response = client.post(
+        "/api/tasks",
+        headers=bearer,
+        json={
+            "category": "seo",
+            "keyword": "solar rebate guide",
+            "info": "Brand: VoltGo",
+            "include_cover": 0,
+            "content_image_count": 0,
+            "task_context": {
+                "country": "au",
+                "market": "row",
+                "article_type": "natural_disaster",
+            },
+        },
+    )
+
+    assert de_response.status_code == 200
+    assert au_response.status_code == 200
+    assert de_response.json()["data"]["task_id"] != au_response.json()["data"]["task_id"]
+
+    de_task = wait_for_task_completion(client, bearer, de_response.json()["data"]["task_id"])
+    assert "Disclaimer" in de_task["article"]["raw_html"]
+    assert de_task["article"]["audit"]["context"]["country"] == "de"
+
     limited = client.get("/api/tasks?limit=1", headers=bearer)
     assert limited.status_code == 200
     limited_tasks = limited.json()["data"]["tasks"]
     assert len(limited_tasks) == 1
-    assert limited_tasks[0]["task_id"] == second_task_id
+    assert limited_tasks[0]["task_id"] == au_response.json()["data"]["task_id"]
 
 
 def test_index_renders_token_and_task_console(tmp_path: Path) -> None:

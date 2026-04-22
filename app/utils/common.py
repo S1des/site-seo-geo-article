@@ -80,3 +80,7 @@ def extract_json_object(raw: str) -> dict[str, Any]:
         raise ValueError("No JSON object found in model response.")
     snippet = text[start : end + 1]
     return json.loads(snippet)
+
+
+def canonical_json(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))

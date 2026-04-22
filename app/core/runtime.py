@@ -7,11 +7,13 @@ from typing import Any
 from fastapi.templating import Jinja2Templates
 
 from app.core.config import Settings
+from app.services.article_validator import ArticleValidator
 from app.services.auth_service import AuthService
 from app.services.cache_service import CacheService
 from app.services.image_service import ImageService
 from app.services.llm_client import LLMClient
 from app.services.oss_service import AliyunOSSService
+from app.services.rulebook_service import RulebookService
 from app.services.task_repository import TaskRepository, build_task_repository
 from app.services.task_service import TaskService
 from app.services.writer_service import WriterService
@@ -42,7 +44,13 @@ def build_services(config_override: dict[str, Any] | None = None) -> AppServices
     auth_service = AuthService(settings)
     oss_service = AliyunOSSService(settings)
     image_service = ImageService(settings, oss_service=oss_service)
-    writer_service = WriterService(LLMClient(settings), image_service=image_service)
+    rulebook_service = RulebookService()
+    writer_service = WriterService(
+        LLMClient(settings),
+        image_service=image_service,
+        rulebook_service=rulebook_service,
+        article_validator=ArticleValidator(),
+    )
     task_repository = build_task_repository(settings)
     task_service = TaskService(
         writer_service=writer_service,

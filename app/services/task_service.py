@@ -32,6 +32,7 @@ class TaskService:
         category: str,
         keyword: str,
         info: str,
+        task_context: dict[str, Any] | None = None,
         language: str = "English",
         provider: str = "openai",
         word_limit: int = 1200,
@@ -44,6 +45,7 @@ class TaskService:
         normalized_keyword = keyword.strip()
         normalized_language = (language or "English").strip() or "English"
         normalized_info = info or ""
+        normalized_task_context = task_context or {}
         normalized_provider = (provider or "openai").strip().lower() or "openai"
         normalized_word_limit = max(200, min(10000, int(word_limit)))
         normalized_access_tier = (access_tier or "standard").strip().lower() or "standard"
@@ -56,6 +58,7 @@ class TaskService:
                 category=normalized_category,
                 keyword=normalized_keyword,
                 info=normalized_info,
+                task_context=normalized_task_context,
                 language=normalized_language,
                 word_limit=normalized_word_limit,
                 access_tier=normalized_access_tier,
@@ -69,6 +72,7 @@ class TaskService:
                 "category": normalized_category,
                 "keyword": normalized_keyword,
                 "info": normalized_info,
+                "task_context": normalized_task_context,
                 "language": normalized_language,
                 "provider": normalized_provider,
                 "word_limit": normalized_word_limit,
@@ -80,6 +84,7 @@ class TaskService:
                     normalized_category,
                     normalized_keyword,
                     normalized_info,
+                    normalized_task_context,
                     normalized_word_limit,
                     normalized_access_tier,
                     normalized_provider,
@@ -130,6 +135,7 @@ class TaskService:
                     task["category"],
                     task["keyword"],
                     task["info"],
+                    task.get("task_context") or {},
                     task.get("word_limit", 1200),
                     task.get("access_tier", "standard"),
                     task.get("provider", "openai"),
@@ -153,6 +159,7 @@ class TaskService:
                         task["keyword"],
                         task["info"],
                         article,
+                        task.get("task_context") or {},
                         task.get("word_limit", 1200),
                         task.get("access_tier", "standard"),
                         task.get("provider", "openai"),
@@ -164,6 +171,7 @@ class TaskService:
                     category=task["category"],
                     keyword=task["keyword"],
                     info=task["info"],
+                    task_context=task.get("task_context") or {},
                     language=task["language"],
                     provider=task.get("provider", "openai"),
                     word_limit=task.get("word_limit", 1200),
@@ -176,6 +184,7 @@ class TaskService:
                     task["keyword"],
                     task["info"],
                     article,
+                    task.get("task_context") or {},
                     task.get("word_limit", 1200),
                     task.get("access_tier", "standard"),
                     task.get("provider", "openai"),

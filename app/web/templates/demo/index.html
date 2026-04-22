@@ -122,6 +122,38 @@
                 <input type="number" name="word_limit" value="1200" min="200" max="10000" step="100" />
               </label>
               <label>
+                Country
+                <input type="text" name="country" placeholder="de / au / za / ph" />
+              </label>
+              <label>
+                Market
+                <select name="market">
+                  <option value="">Auto</option>
+                  <option value="eu">EU</option>
+                  <option value="row">ROW</option>
+                </select>
+              </label>
+              <label>
+                Article Type
+                <select name="article_type">
+                  <option value="">General</option>
+                  <option value="policy_incentive">Policy Incentive</option>
+                  <option value="appliance_rebate">Appliance Rebate</option>
+                  <option value="competitor_comparison">Competitor Comparison</option>
+                  <option value="natural_disaster">Natural Disaster</option>
+                </select>
+              </label>
+              <label>
+                Product Line
+                <select name="product_line">
+                  <option value="">General</option>
+                  <option value="stream">STREAM</option>
+                  <option value="delta_3_max">DELTA 3 Max</option>
+                  <option value="delta_3_max_plus">DELTA 3 Max Plus</option>
+                  <option value="wave_3">WAVE 3</option>
+                </select>
+              </label>
+              <label>
                 Cover Image
                 <select name="include_cover">
                   <option value="1">1</option>
@@ -145,12 +177,24 @@
                 Brand / Product Info
                 <textarea name="info" rows="6" placeholder="Brand: VoltGo&#10;Product: 20000mAh portable charger&#10;Highlights: airline-safe, fast charging, digital display"></textarea>
               </label>
+              <label class="full">
+                Shopify / Product URL
+                <input type="url" name="shopify_url" placeholder="https://de.ecoflow.com/products/stream-microinverter" />
+              </label>
+              <label class="toggle full">
+                <input type="checkbox" name="requires_shopify_link" value="true" />
+                Force an early product-page link in the first two paragraphs
+              </label>
+              <label class="toggle full">
+                <input type="checkbox" name="mentions_other_brands" value="true" />
+                This article mentions other brands and may need a comparison disclaimer
+              </label>
               <label class="toggle full">
                 <input type="checkbox" name="force_refresh" value="true" />
                 Force refresh and ignore cache for this run
               </label>
               <div class="token-note">
-                `word_limit` defaults to `1200` and counts only text content (excluding images). `content_image_count` supports `0-3`. When it is `0`, no body images are generated. `include_cover` is only `0` or `1`.
+                `task_context` now supports country, market, article type, product line, and early-link requirements. `word_limit` defaults to `1200` and counts only text content (excluding images). `content_image_count` supports `0-3`. When it is `0`, no body images are generated. `include_cover` is only `0` or `1`.
               </div>
               <div class="actions">
                 <button class="btn btn-primary" type="submit" id="submit-btn">Start Task</button>

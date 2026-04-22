@@ -71,6 +71,7 @@ def create_api_router(services: AppServices) -> APIRouter:
         info = (payload.info or payload.brand_info or "").strip()
         language = (payload.language or "English").strip() or "English"
         provider = (payload.provider or "openai").strip().lower()
+        task_context = services.writer_service.rulebook_service.normalize_task_context(payload.task_context.model_dump())
         auth_payload = resolve_auth_payload(services, authorization)
 
         if category not in {"seo", "geo"}:
@@ -102,6 +103,7 @@ def create_api_router(services: AppServices) -> APIRouter:
                 category=category,
                 keyword=keyword,
                 info=info,
+                task_context=task_context,
                 language=language,
                 provider=provider,
                 word_limit=payload.word_limit,

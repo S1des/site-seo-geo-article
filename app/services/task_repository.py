@@ -11,6 +11,7 @@ from threading import Lock
 from typing import Any, Callable, Protocol
 
 from app.core.config import Settings
+from app.utils.common import canonical_json
 
 try:
     import pymysql
@@ -39,6 +40,7 @@ class TaskRepository(Protocol):
         category: str,
         keyword: str,
         info: str,
+        task_context: dict[str, Any],
         language: str,
         word_limit: int,
         access_tier: str,
@@ -120,6 +122,7 @@ class MemoryTaskRepository:
         category: str,
         keyword: str,
         info: str,
+        task_context: dict[str, Any],
         language: str,
         word_limit: int,
         access_tier: str,
@@ -132,6 +135,7 @@ class MemoryTaskRepository:
                 if task.get("category") == category
                 and task.get("keyword") == keyword
                 and task.get("info") == info
+                and canonical_json(task.get("task_context") or {}) == canonical_json(task_context or {})
                 and task.get("language") == language
                 and int(task.get("word_limit", 1200)) == int(word_limit)
                 and str(task.get("access_tier") or "standard") == access_tier
@@ -198,6 +202,7 @@ class MySQLTaskRepository:
                         category,
                         keyword,
                         info,
+                        task_context_json,
                         language,
                         provider,
                         word_limit,
@@ -212,12 +217,13 @@ class MySQLTaskRepository:
                         created_at,
                         updated_at,
                         completed_at
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """,
                     (
                         payload["category"],
                         payload["keyword"],
                         payload["info"],
+                        canonical_json(payload.get("task_context") or {}),
                         payload["language"],
                         payload.get("provider", "openai"),
                         int(payload.get("word_limit", 1200)),
@@ -284,6 +290,7 @@ class MySQLTaskRepository:
         category: str,
         keyword: str,
         info: str,
+        task_context: dict[str, Any],
         language: str,
         word_limit: int,
         access_tier: str,
@@ -299,6 +306,7 @@ class MySQLTaskRepository:
                     WHERE t.category = %s
                       AND t.keyword = %s
                       AND t.info = %s
+                      AND t.task_context_json = %s
                       AND t.language = %s
                       AND t.word_limit = %s
                       AND t.access_tier = %s
@@ -307,7 +315,16 @@ class MySQLTaskRepository:
                     ORDER BY t.id DESC
                     LIMIT 1
                     """,
-                    (category, keyword, info, language, int(word_limit), access_tier, provider or "openai"),
+                    (
+                        category,
+                        keyword,
+                        info,
+                        canonical_json(task_context or {}),
+                        language,
+                        int(word_limit),
+                        access_tier,
+                        provider or "openai",
+                    ),
                 )
                 return cursor.fetchone()
 
@@ -596,6 +613,29 @@ class MySQLTaskRepository:
 
             self._run_with_retry(_add_provider)
 
+        if not self._run_with_retry(lambda conn: _column_exists(conn, "task_context_json")):
+            logger.warning("MySQL column `%s.task_context_json` is missing; adding it automatically.", TASK_TABLE)
+
+            def _add_task_context_json(connection: Any) -> None:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        f"""
+                        ALTER TABLE {TASK_TABLE}
+                        ADD COLUMN task_context_json LONGTEXT NOT NULL
+                        COMMENT 'Normalized task context as JSON'
+                        AFTER info
+                        """
+                    )
+                    cursor.execute(
+                        f"""
+                        UPDATE {TASK_TABLE}
+                        SET task_context_json = '{{}}'
+                        WHERE task_context_json IS NULL OR task_context_json = ''
+                        """
+                    )
+
+            self._run_with_retry(_add_task_context_json)
+
 
 def _utcnow_db() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
@@ -614,6 +654,7 @@ def _serialize_task_row(row: dict[str, Any]) -> dict[str, Any]:
         "category": str(row.get("category") or ""),
         "keyword": str(row.get("keyword") or ""),
         "info": str(row.get("info") or ""),
+        "task_context": _parse_task_context(row.get("task_context_json")),
         "language": str(row.get("language") or "English"),
         "provider": str(row.get("provider") or "openai"),
         "word_limit": word_limit,
@@ -655,6 +696,11 @@ def _serialize_result_row(row: dict[str, Any]) -> dict[str, Any]:
         "created_at": _db_datetime_to_iso(row.get("created_at")),
         "updated_at": _db_datetime_to_iso(row.get("updated_at")),
     }
+
+
+def _parse_task_context(value: Any) -> dict[str, Any]:
+    parsed = _parse_article_json(value)
+    return parsed if isinstance(parsed, dict) else {}
 
 
 def _as_int(value: Any, default: int) -> int:

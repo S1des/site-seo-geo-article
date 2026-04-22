@@ -8,6 +8,7 @@ def test_build_draft_prompt_includes_word_limit() -> None:
         "Brand: VoltGo",
         "English",
         {"h1_options": ["Portable Charger Guide"]},
+        {},
         1800,
     )
     assert "1800" in prompt
@@ -15,6 +16,6 @@ def test_build_draft_prompt_includes_word_limit() -> None:
 
 
 def test_build_polish_prompt_includes_word_limit() -> None:
-    prompt = build_polish_prompt("geo", "English", "portable charger", "<h1>demo</h1>", 1400)
+    prompt = build_polish_prompt("geo", "English", "portable charger", "<h1>demo</h1>", {}, 1400)
     assert "1400" in prompt
     assert "excluding image content" in prompt
