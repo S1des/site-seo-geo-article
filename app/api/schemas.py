@@ -86,6 +86,7 @@ class TaskAcceptedData(BaseModel):
     task_id: int
     status: str
     access_tier: str
+    mode_type: int
 
 
 class TaskCreateResponse(BaseModel):

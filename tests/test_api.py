@@ -76,6 +76,7 @@ def test_create_task_and_fetch_result(tmp_path: Path) -> None:
     assert create_response.status_code == 200
     task_id = create_response.json()["data"]["task_id"]
     assert create_response.json()["data"]["access_tier"] == "vip"
+    assert create_response.json()["data"]["mode_type"] == 1
 
     task_payload = wait_for_task_completion(client, bearer, task_id)
     status = task_payload["status"]
@@ -412,6 +413,7 @@ def test_create_task_accepts_outline_in_keyword_field_for_outline_mode(tmp_path:
     )
     assert response.status_code == 200
     task_id = response.json()["data"]["task_id"]
+    assert response.json()["data"]["mode_type"] == 2
     task_payload = wait_for_task_completion(client, bearer, task_id)
     assert task_payload["mode_type"] == 2
     assert "<h2>Airline rules</h2>" in task_payload["article"]["raw_html"]

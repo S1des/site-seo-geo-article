@@ -199,6 +199,7 @@ def create_api_router(services: AppServices) -> APIRouter:
                 task_id=task["task_id"],
                 status=task["status"],
                 access_tier=auth_payload["tier"],
+                mode_type=task.get("mode_type", mode_type),
             )
         )
 
