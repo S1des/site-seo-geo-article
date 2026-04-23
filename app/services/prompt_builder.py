@@ -4,6 +4,14 @@ from textwrap import dedent
 from typing import Any
 
 
+MODE_TYPE_KEYWORD = 1
+MODE_TYPE_OUTLINE = 2
+
+
+def _normalize_mode_type(mode_type: int) -> int:
+    return MODE_TYPE_OUTLINE if int(mode_type) == MODE_TYPE_OUTLINE else MODE_TYPE_KEYWORD
+
+
 def _build_rule_brief(rule_context: dict[str, Any]) -> str:
     context = rule_context.get("context", {})
     notes = [
@@ -44,15 +52,28 @@ def build_strategy_prompt(
     info: str,
     language: str,
     rule_context: dict[str, Any] | None = None,
+    mode_type: int = MODE_TYPE_KEYWORD,
 ) -> str:
     rule_brief = _build_rule_brief(rule_context or {})
+    normalized_mode_type = _normalize_mode_type(mode_type)
+    source_label = "Provided outline" if normalized_mode_type == MODE_TYPE_OUTLINE else "Brand or product information"
+    mode_requirements = (
+        """
+            - mode_type=2 means the provided content is the required outline, not optional background info
+            - Preserve the outline hierarchy, heading order, and section intent from the provided outline
+            - Do not invent extra H2/H3 sections unless a minimal structural repair is required
+            - If the outline contains an H1, use it as the primary H1 option
+        """
+        if normalized_mode_type == MODE_TYPE_OUTLINE
+        else ""
+    )
     if category == "seo":
         return dedent(
             f"""
             You are a senior SEO content strategist.
             Create a writing strategy for the keyword "{keyword}".
 
-            Brand or product information:
+            {source_label}:
             {info or "None provided."}
 
             Rule context:
@@ -94,6 +115,7 @@ def build_strategy_prompt(
             - Internal link plan should call out the best early-link placement when rule context requires it
             - Compliance notes should reflect disclaimers, compatibility notes, or banned-term constraints
             - Image briefs should describe helpful supporting visuals and mention keyword placement advice
+            {mode_requirements}
             """
         ).strip()
 
@@ -102,7 +124,7 @@ def build_strategy_prompt(
         You are a GEO content strategist focused on AI citability and answer extraction.
         Create a writing strategy for the keyword "{keyword}".
 
-        Brand or product information:
+        {source_label}:
         {info or "None provided."}
 
         Rule context:
@@ -149,6 +171,7 @@ def build_strategy_prompt(
         - Meta title should stay within 60 characters
         - Meta description should stay within 160 characters
         - If internal links are required, plan them near the top of the article
+        {mode_requirements}
         """
     ).strip()
 
@@ -161,8 +184,21 @@ def build_draft_prompt(
     strategy: dict,
     rule_context: dict[str, Any] | None = None,
     word_limit: int = 1200,
+    mode_type: int = MODE_TYPE_KEYWORD,
 ) -> str:
     rule_brief = _build_rule_brief(rule_context or {})
+    normalized_mode_type = _normalize_mode_type(mode_type)
+    source_label = "Provided outline" if normalized_mode_type == MODE_TYPE_OUTLINE else "Brand/Product info"
+    mode_requirements = (
+        """
+            - mode_type=2 means the provided content is a required outline, not optional context
+            - Follow the provided outline strictly: preserve heading order, heading levels, and section boundaries
+            - Do not add, remove, rename, merge, or reorder headings unless the outline is malformed and needs a minimal repair
+            - Keep SEO/GEO writing quality inside the provided outline instead of inventing a different structure
+        """
+        if normalized_mode_type == MODE_TYPE_OUTLINE
+        else ""
+    )
     if category == "seo":
         return dedent(
             f"""
@@ -171,7 +207,7 @@ def build_draft_prompt(
 
             Keyword: {keyword}
             Language: {language}
-            Brand/Product info: {info or "None provided."}
+            {source_label}: {info or "None provided."}
             Strategy JSON:
             {strategy}
             Rule context:
@@ -193,6 +229,7 @@ def build_draft_prompt(
             - If brand/product info is provided, integrate it naturally without turning the article into a sales page
             - Use provided internal URLs when the strategy includes them; otherwise do not invent URLs
             - Respect all compliance notes, disclaimers, and compatibility constraints from the rule context
+            {mode_requirements}
             """
         ).strip()
 
@@ -203,7 +240,7 @@ def build_draft_prompt(
 
         Keyword: {keyword}
         Language: {language}
-        Brand/Product info: {info or "None provided."}
+        {source_label}: {info or "None provided."}
         Strategy JSON:
         {strategy}
         Rule context:
@@ -225,6 +262,7 @@ def build_draft_prompt(
         - Mention citations, proof, benchmark data, or source types without inventing fake source URLs
         - If brand/product info is provided, keep entity mentions consistent and verifiable
         - Respect all compliance notes, disclaimers, and compatibility constraints from the rule context
+        {mode_requirements}
         """
     ).strip()
 
@@ -236,6 +274,7 @@ def build_polish_prompt(
     html: str,
     rule_context: dict[str, Any] | None = None,
     word_limit: int = 1200,
+    mode_type: int = MODE_TYPE_KEYWORD,
 ) -> str:
     flavor = (
         "Improve naturalness, specificity, and SEO readability."
@@ -243,6 +282,11 @@ def build_polish_prompt(
         else "Improve citability, answer extraction, and trust signals."
     )
     rule_brief = _build_rule_brief(rule_context or {})
+    mode_requirement = (
+        '- mode_type=2: keep the exact heading structure, order, and section boundaries from the current HTML'
+        if _normalize_mode_type(mode_type) == MODE_TYPE_OUTLINE
+        else ""
+    )
     return dedent(
         f"""
         You are an expert editor.
@@ -257,6 +301,7 @@ def build_polish_prompt(
         - Keep textual content close to {word_limit} words/characters (excluding image content)
         - Keep compliance with the following rule context:
         {rule_brief}
+        {mode_requirement}
         - Return HTML only
 
         Article:

@@ -177,9 +177,16 @@
                 Keyword
                 <input type="text" name="keyword" required placeholder="portable charger on plane" />
               </label>
+              <label>
+                Mode Type
+                <select name="mode_type">
+                  <option value="1">1 - Keyword</option>
+                  <option value="2">2 - Outline</option>
+                </select>
+              </label>
               <label class="full">
-                Brand / Product Info
-                <textarea name="info" rows="6" placeholder="Brand: VoltGo&#10;Product: 20000mAh portable charger&#10;Highlights: airline-safe, fast charging, digital display"></textarea>
+                Brand / Product Info or Outline
+                <textarea name="info" rows="6" placeholder="Keyword mode:&#10;Brand: VoltGo&#10;Product: 20000mAh portable charger&#10;Highlights: airline-safe, fast charging, digital display&#10;&#10;Outline mode:&#10;# Portable Charger on Plane&#10;## Airline rules&#10;## Battery limits&#10;### Domestic flights&#10;### International flights"></textarea>
               </label>
               <label class="full">
                 Shopify / Product URL
@@ -198,7 +205,7 @@
                 Force refresh and ignore cache for this run
               </label>
               <div class="token-note">
-                `task_context` now supports country, market, article type, product line, and early-link requirements. `word_limit` defaults to `1200` and counts only text content (excluding images). `content_image_count` supports `0-3`. When it is `0`, no body images are generated. `include_cover` is only `0` or `1`.
+                `mode_type` defaults to `1` for keyword mode and uses `2` for outline mode. In outline mode, paste the article outline into `info` and the writer will follow that structure strictly. `task_context` now supports country, market, article type, product line, and early-link requirements. `word_limit` defaults to `1200` and counts only text content (excluding images). `content_image_count` supports `0-3`. When it is `0`, no body images are generated. `include_cover` is only `0` or `1`.
               </div>
               <div class="actions">
                 <button class="btn btn-primary" type="submit" id="submit-btn">Start Task</button>

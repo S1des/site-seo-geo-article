@@ -39,6 +39,7 @@ class TaskRepository(Protocol):
         *,
         category: str,
         keyword: str,
+        mode_type: int,
         info: str,
         task_context: dict[str, Any],
         language: str,
@@ -121,6 +122,7 @@ class MemoryTaskRepository:
         *,
         category: str,
         keyword: str,
+        mode_type: int,
         info: str,
         task_context: dict[str, Any],
         language: str,
@@ -134,6 +136,7 @@ class MemoryTaskRepository:
                 for task in self._tasks.values()
                 if task.get("category") == category
                 and task.get("keyword") == keyword
+                and int(task.get("mode_type", 1)) == int(mode_type)
                 and task.get("info") == info
                 and canonical_json(task.get("task_context") or {}) == canonical_json(task_context or {})
                 and task.get("language") == language
@@ -201,6 +204,7 @@ class MySQLTaskRepository:
                     INSERT INTO {TASK_TABLE} (
                         category,
                         keyword,
+                        mode_type,
                         info,
                         task_context_json,
                         language,
@@ -217,11 +221,12 @@ class MySQLTaskRepository:
                         created_at,
                         updated_at,
                         completed_at
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """,
                     (
                         payload["category"],
                         payload["keyword"],
+                        int(payload.get("mode_type", 1)),
                         payload["info"],
                         canonical_json(payload.get("task_context") or {}),
                         payload["language"],
@@ -289,6 +294,7 @@ class MySQLTaskRepository:
         *,
         category: str,
         keyword: str,
+        mode_type: int,
         info: str,
         task_context: dict[str, Any],
         language: str,
@@ -305,6 +311,7 @@ class MySQLTaskRepository:
                     INNER JOIN {RESULT_TABLE} AS r ON r.task_id = t.id
                     WHERE t.category = %s
                       AND t.keyword = %s
+                      AND t.mode_type = %s
                       AND t.info = %s
                       AND t.task_context_json = %s
                       AND t.language = %s
@@ -318,6 +325,7 @@ class MySQLTaskRepository:
                     (
                         category,
                         keyword,
+                        int(mode_type),
                         info,
                         canonical_json(task_context or {}),
                         language,
@@ -636,6 +644,22 @@ class MySQLTaskRepository:
 
             self._run_with_retry(_add_task_context_json)
 
+        if not self._run_with_retry(lambda conn: _column_exists(conn, "mode_type")):
+            logger.warning("MySQL column `%s.mode_type` is missing; adding it automatically.", TASK_TABLE)
+
+            def _add_mode_type(connection: Any) -> None:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        f"""
+                        ALTER TABLE {TASK_TABLE}
+                        ADD COLUMN mode_type TINYINT UNSIGNED NOT NULL DEFAULT 1
+                        COMMENT '1 keyword mode, 2 outline mode'
+                        AFTER keyword
+                        """
+                    )
+
+            self._run_with_retry(_add_mode_type)
+
 
 def _utcnow_db() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
@@ -653,6 +677,7 @@ def _serialize_task_row(row: dict[str, Any]) -> dict[str, Any]:
         "task_id": _as_int(row.get("id"), 0),
         "category": str(row.get("category") or ""),
         "keyword": str(row.get("keyword") or ""),
+        "mode_type": 2 if _as_int(row.get("mode_type"), 1) == 2 else 1,
         "info": str(row.get("info") or ""),
         "task_context": _parse_task_context(row.get("task_context_json")),
         "language": str(row.get("language") or "English"),

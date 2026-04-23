@@ -136,6 +136,7 @@ def create_api_router(services: AppServices) -> APIRouter:
     ) -> TaskCreateResponse | JSONResponse:
         category = payload.category.strip().lower()
         keyword = payload.keyword.strip()
+        mode_type = int(payload.mode_type or 1)
         info = (payload.info or payload.brand_info or "").strip()
         language = (payload.language or "English").strip() or "English"
         provider = (payload.provider or "openai").strip().lower()
@@ -160,6 +161,18 @@ def create_api_router(services: AppServices) -> APIRouter:
                 content={"success": False, "message": "keyword is required"},
             )
 
+        if mode_type not in {1, 2}:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"success": False, "message": "mode_type must be 1 or 2"},
+            )
+
+        if mode_type == 2 and not info:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"success": False, "message": "info is required when mode_type=2"},
+            )
+
         if provider not in {"openai", "anthropic"}:
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -170,6 +183,7 @@ def create_api_router(services: AppServices) -> APIRouter:
             task = services.task_service.create_task(
                 category=category,
                 keyword=keyword,
+                mode_type=mode_type,
                 info=info,
                 task_context=task_context,
                 language=language,

@@ -31,6 +31,7 @@ class TaskService:
         *,
         category: str,
         keyword: str,
+        mode_type: int = 1,
         info: str,
         task_context: dict[str, Any] | None = None,
         language: str = "English",
@@ -43,6 +44,7 @@ class TaskService:
     ) -> dict[str, Any]:
         normalized_category = normalize_text(category)
         normalized_keyword = keyword.strip()
+        normalized_mode_type = 2 if int(mode_type) == 2 else 1
         normalized_language = (language or "English").strip() or "English"
         normalized_info = info or ""
         normalized_task_context = task_context or {}
@@ -57,6 +59,7 @@ class TaskService:
             reusable_task = self.task_repository.find_reusable_task(
                 category=normalized_category,
                 keyword=normalized_keyword,
+                mode_type=normalized_mode_type,
                 info=normalized_info,
                 task_context=normalized_task_context,
                 language=normalized_language,
@@ -71,6 +74,7 @@ class TaskService:
             {
                 "category": normalized_category,
                 "keyword": normalized_keyword,
+                "mode_type": normalized_mode_type,
                 "info": normalized_info,
                 "task_context": normalized_task_context,
                 "language": normalized_language,
@@ -84,6 +88,7 @@ class TaskService:
                     normalized_category,
                     normalized_keyword,
                     normalized_info,
+                    normalized_mode_type,
                     normalized_task_context,
                     normalized_word_limit,
                     normalized_access_tier,
@@ -135,6 +140,7 @@ class TaskService:
                     task["category"],
                     task["keyword"],
                     task["info"],
+                    task.get("mode_type", 1),
                     task.get("task_context") or {},
                     task.get("word_limit", 1200),
                     task.get("access_tier", "standard"),
@@ -150,6 +156,7 @@ class TaskService:
                         article=article,
                         category=task["category"],
                         keyword=task["keyword"],
+                        mode_type=task.get("mode_type", 1),
                         info=task["info"],
                         include_cover=task.get("include_cover", 1),
                         content_image_count=task.get("content_image_count", 0),
@@ -159,6 +166,7 @@ class TaskService:
                         task["keyword"],
                         task["info"],
                         article,
+                        task.get("mode_type", 1),
                         task.get("task_context") or {},
                         task.get("word_limit", 1200),
                         task.get("access_tier", "standard"),
@@ -170,6 +178,7 @@ class TaskService:
                     asset_namespace=task["cache_key"],
                     category=task["category"],
                     keyword=task["keyword"],
+                    mode_type=task.get("mode_type", 1),
                     info=task["info"],
                     task_context=task.get("task_context") or {},
                     language=task["language"],
@@ -184,6 +193,7 @@ class TaskService:
                     task["keyword"],
                     task["info"],
                     article,
+                    task.get("mode_type", 1),
                     task.get("task_context") or {},
                     task.get("word_limit", 1200),
                     task.get("access_tier", "standard"),

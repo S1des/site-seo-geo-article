@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import re
 from typing import Any
 
 from app.services.article_validator import ArticleValidator
@@ -34,6 +35,7 @@ class WriterService:
         asset_namespace: str,
         category: str,
         keyword: str,
+        mode_type: int = 1,
         info: str,
         task_context: dict[str, Any] | None = None,
         language: str = "English",
@@ -43,6 +45,7 @@ class WriterService:
         include_cover: int = 1,
         content_image_count: int = 3,
     ) -> dict[str, Any]:
+        normalized_mode_type = 2 if int(mode_type) == 2 else 1
         normalized_word_limit = max(200, int(word_limit))
         normalized_context = self.rulebook_service.normalize_task_context(task_context)
         rule_context = self.rulebook_service.resolve_rules(
@@ -52,7 +55,14 @@ class WriterService:
         )
 
         if self.llm_client.enabled(provider):
-            strategy_prompt = build_strategy_prompt(category, keyword, info, language, rule_context)
+            strategy_prompt = build_strategy_prompt(
+                category,
+                keyword,
+                info,
+                language,
+                rule_context,
+                normalized_mode_type,
+            )
             raw_strategy = self.llm_client.complete(
                 strategy_prompt,
                 expect_json=True,
@@ -69,6 +79,7 @@ class WriterService:
                 strategy,
                 rule_context,
                 normalized_word_limit,
+                normalized_mode_type,
             )
             draft_html = self.llm_client.complete(draft_prompt, access_tier=access_tier, provider=provider)
 
@@ -79,6 +90,7 @@ class WriterService:
                 draft_html,
                 rule_context,
                 normalized_word_limit,
+                normalized_mode_type,
             )
             polished_html = self.llm_client.complete(polish_prompt, access_tier=access_tier, provider=provider)
 
@@ -88,6 +100,7 @@ class WriterService:
                 info=info,
                 task_context=normalized_context,
                 language=language,
+                mode_type=normalized_mode_type,
                 strategy=strategy,
                 rule_context=rule_context,
                 html=polished_html.strip(),
@@ -101,6 +114,7 @@ class WriterService:
                 info=info,
                 task_context=normalized_context,
                 language=language,
+                mode_type=normalized_mode_type,
                 word_limit=normalized_word_limit,
             )
 
@@ -127,6 +141,7 @@ class WriterService:
         article: dict[str, Any],
         category: str,
         keyword: str,
+        mode_type: int = 1,
         info: str,
         include_cover: int = 1,
         content_image_count: int = 3,
@@ -190,6 +205,7 @@ class WriterService:
         info: str,
         task_context: dict[str, Any] | None,
         language: str,
+        mode_type: int,
         strategy: dict[str, Any],
         rule_context: dict[str, Any],
         html: str,
@@ -204,6 +220,7 @@ class WriterService:
         return {
             "category": category,
             "keyword": keyword,
+            "mode_type": 2 if int(mode_type) == 2 else 1,
             "language": language,
             "task_context": task_context or {},
             "title": title,
@@ -234,6 +251,7 @@ class WriterService:
         info: str,
         task_context: dict[str, Any] | None,
         language: str,
+        mode_type: int,
         word_limit: int,
     ) -> dict[str, Any]:
         brand_line = info.strip() or "Use your real brand, product facts, and proof here."
@@ -247,6 +265,106 @@ class WriterService:
             if rule_context.get("shopify_url")
             else "official product page"
         )
+        normalized_mode_type = 2 if int(mode_type) == 2 else 1
+
+        if normalized_mode_type == 2:
+            h1_title, outline = self._extract_outline_structure(keyword, info)
+            if not outline:
+                outline = [
+                    {"level": "H2", "title": f"{keyword} overview"},
+                    {"level": "H2", "title": "Key points"},
+                ]
+
+            faq_questions = [item["title"] for item in outline if item["title"].endswith("?")][:4]
+            if category == "seo":
+                strategy = {
+                    "intent": "outline-driven article writing",
+                    "audience": "readers expecting the provided outline to be expanded clearly",
+                    "meta_title": truncate(h1_title, int(rule_context["meta_title_limit"])),
+                    "meta_description": truncate(
+                        f"Outline-based SEO article for {keyword} that follows the supplied structure closely.",
+                        int(rule_context["meta_description_limit"]),
+                    ),
+                    "h1_options": [h1_title],
+                    "outline": outline,
+                    "longtail_keywords": [keyword],
+                    "faq_questions": faq_questions,
+                    "image_briefs": [f"Editorial image for {keyword}"],
+                    "link_opportunities": ["Use official product or support pages where relevant"],
+                    "compliance_notes": rule_context.get("required_notes", []),
+                    "internal_link_plan": rule_context.get("resolved_internal_links", []),
+                }
+            else:
+                strategy = {
+                    "search_intent": "outline-driven answer content",
+                    "audience": "readers expecting a concise answer that follows the supplied outline",
+                    "meta_title": truncate(h1_title, int(rule_context["meta_title_limit"])),
+                    "meta_description": truncate(
+                        f"Outline-based GEO article for {keyword} that follows the supplied structure closely.",
+                        int(rule_context["meta_description_limit"]),
+                    ),
+                    "answer_first_summary": f"The short answer to {keyword} should stay consistent with the supplied outline.",
+                    "entity_summary": brand_line,
+                    "h1_options": [h1_title],
+                    "outline": outline,
+                    "claim_blocks": [],
+                    "faq_questions": faq_questions,
+                    "reference_plan": ["Use official or verifiable sources that match the supplied outline"],
+                    "internal_link_plan": rule_context.get("resolved_internal_links", []),
+                    "compliance_notes": rule_context.get("required_notes", []),
+                    "schema_suggestions": ["Article", "FAQPage"],
+                    "trust_signals": ["author byline", "publish date", "last updated", "references"],
+                    "image_briefs": [f"Editorial image for {keyword}"],
+                }
+
+            html_parts = [f"<h1>{h1_title}</h1>"]
+            if category == "seo":
+                html_parts.append(
+                    f"<p>This draft follows the supplied outline for {keyword} and expands each section without changing the requested structure.</p>"
+                )
+                html_parts.append(
+                    f"<p>Use the {internal_link} where it helps the reader, and keep brand context supportive instead of promotional.</p>"
+                )
+            else:
+                html_parts.append(
+                    f"<p>The short answer for {keyword} should be stated clearly first, then expanded strictly within the supplied outline.</p>"
+                )
+                html_parts.append(
+                    f"<p>Use direct, evidence-aware language and point readers to the {internal_link} when an official reference helps validate the answer.</p>"
+                )
+
+            for item in outline:
+                tag = item["level"].lower()
+                title = item["title"]
+                html_parts.append(f"<{tag}>{title}</{tag}>")
+                if category == "seo":
+                    html_parts.append(
+                        f"<p>This section expands on {title} while keeping the original outline order and intent intact for {keyword}.</p>"
+                    )
+                    html_parts.append(
+                        "<p>Add concrete examples, search-intent detail, and brand-specific proof only when they directly support this outline section.</p>"
+                    )
+                else:
+                    html_parts.append(
+                        f"<p>This section answers {title} in a concise, extractable way and keeps the entity framing consistent with {keyword}.</p>"
+                    )
+                    html_parts.append(
+                        "<p>Support the key claims here with source types, product facts, or policy references that match this outline section.</p>"
+                    )
+
+            return self._package_article(
+                category=category,
+                keyword=keyword,
+                info=info,
+                task_context=task_context,
+                language=language,
+                mode_type=normalized_mode_type,
+                strategy=strategy,
+                rule_context=rule_context,
+                html="\n".join(html_parts).strip(),
+                generation_mode="mock",
+                word_limit=word_limit,
+            )
 
         if category == "seo":
             strategy = {
@@ -396,12 +514,44 @@ class WriterService:
             info=info,
             task_context=task_context,
             language=language,
+            mode_type=normalized_mode_type,
             strategy=strategy,
             rule_context=rule_context,
             html=html,
             generation_mode="mock",
             word_limit=word_limit,
         )
+
+    def _extract_outline_structure(self, keyword: str, outline_text: str) -> tuple[str, list[dict[str, str]]]:
+        title = keyword
+        outline: list[dict[str, str]] = []
+
+        for raw_line in outline_text.splitlines():
+            stripped = raw_line.strip()
+            if not stripped:
+                continue
+
+            markdown_match = re.match(r"^(#{1,6})\s+(.*)$", stripped)
+            if markdown_match:
+                level = len(markdown_match.group(1))
+                heading = markdown_match.group(2).strip()
+                if not heading:
+                    continue
+                if level == 1:
+                    title = heading
+                    continue
+                outline.append({"level": "H2" if level == 2 else "H3", "title": heading})
+                continue
+
+            cleaned = re.sub(r"^\s*(?:[-*+]\s+|\d+[.)]\s+)", "", raw_line).strip()
+            cleaned = re.sub(r"^(H[23])[:：\-\s]+", "", cleaned, flags=re.IGNORECASE).strip()
+            if not cleaned:
+                continue
+
+            indent = len(raw_line) - len(raw_line.lstrip())
+            outline.append({"level": "H3" if indent >= 2 and outline else "H2", "title": cleaned})
+
+        return title, outline
 
     def _attach_images(
         self,

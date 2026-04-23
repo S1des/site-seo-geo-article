@@ -43,6 +43,7 @@ class TaskContextRequest(BaseModel):
 class TaskCreateRequest(BaseModel):
     category: str = Field(..., examples=["seo"])
     keyword: str = Field(..., examples=["portable charger on plane"])
+    mode_type: int = Field(default=1, ge=1, le=2, examples=[1])
     info: str = ""
     brand_info: str = ""
     language: str = "English"
@@ -58,6 +59,7 @@ class TaskCreateRequest(BaseModel):
             "example": {
                 "category": "seo",
                 "keyword": "portable charger on plane",
+                "mode_type": 1,
                 "info": "Brand: VoltGo. Product: 20000mAh portable charger.",
                 "language": "English",
                 "provider": "openai",

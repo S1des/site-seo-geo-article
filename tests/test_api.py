@@ -85,6 +85,7 @@ def test_create_task_and_fetch_result(tmp_path: Path) -> None:
     assert task_payload is not None
     assert task_payload["access_tier"] == "vip"
     assert task_payload["keyword"] == "portable charger on plane"
+    assert task_payload["mode_type"] == 1
     assert task_payload["word_limit"] == 1200
     assert task_payload["task_context"]["country"] == "de"
     assert task_payload["article"]["generation_mode"] == "mock"
@@ -327,6 +328,96 @@ def test_word_limit_creates_distinct_task_when_changed(tmp_path: Path) -> None:
     assert second_task["word_limit"] == 1800
 
 
+def test_mode_type_changes_cache_scope_and_outline_mode_preserves_headings(tmp_path: Path) -> None:
+    app = create_app(
+        {
+            "data_dir": tmp_path,
+            "llm_mock_mode": True,
+            "openai_api_key": "",
+            "normal_access_key": "test-standard-key",
+            "vip_access_key": "test-vip-key",
+            "token_signing_secret": "test-signing-secret",
+        }
+    )
+    client = TestClient(app)
+    token_data = issue_token(client)
+    bearer = {"Authorization": f"Bearer {token_data['access_token']}"}
+
+    first_response = client.post(
+        "/api/tasks",
+        headers=bearer,
+        json={
+            "category": "seo",
+            "keyword": "portable charger on plane",
+            "mode_type": 1,
+            "info": "Brand: VoltGo",
+            "include_cover": 0,
+            "content_image_count": 0,
+        },
+    )
+    assert first_response.status_code == 200
+    first_task_id = first_response.json()["data"]["task_id"]
+    wait_for_task_completion(client, bearer, first_task_id)
+
+    second_response = client.post(
+        "/api/tasks",
+        headers=bearer,
+        json={
+            "category": "seo",
+            "keyword": "portable charger on plane",
+            "mode_type": 2,
+            "info": "# Portable Charger on Plane\n## Airline rules\n## Battery limits\n### Domestic flights",
+            "include_cover": 0,
+            "content_image_count": 0,
+        },
+    )
+    assert second_response.status_code == 200
+    second_task_id = second_response.json()["data"]["task_id"]
+    assert second_task_id != first_task_id
+
+    second_task = wait_for_task_completion(client, bearer, second_task_id)
+    assert second_task["mode_type"] == 2
+    assert second_task["article"]["mode_type"] == 2
+    html = second_task["article"]["raw_html"]
+    assert "<h1>Portable Charger on Plane</h1>" in html
+    assert "<h2>Airline rules</h2>" in html
+    assert "<h2>Battery limits</h2>" in html
+    assert "<h3>Domestic flights</h3>" in html
+    assert html.index("<h2>Airline rules</h2>") < html.index("<h2>Battery limits</h2>")
+
+
+def test_create_task_requires_info_in_outline_mode(tmp_path: Path) -> None:
+    app = create_app(
+        {
+            "data_dir": tmp_path,
+            "llm_mock_mode": True,
+            "openai_api_key": "",
+            "normal_access_key": "test-standard-key",
+            "vip_access_key": "test-vip-key",
+            "token_signing_secret": "test-signing-secret",
+        }
+    )
+    client = TestClient(app)
+    token_data = issue_token(client)
+    bearer = {"Authorization": f"Bearer {token_data['access_token']}"}
+
+    response = client.post(
+        "/api/tasks",
+        headers=bearer,
+        json={
+            "category": "seo",
+            "keyword": "portable charger on plane",
+            "mode_type": 2,
+            "include_cover": 0,
+            "content_image_count": 0,
+        },
+    )
+    assert response.status_code == 400
+    payload = response.json()
+    assert payload["success"] is False
+    assert payload["message"] == "info is required when mode_type=2"
+
+
 def test_reuse_existing_task_is_scoped_by_access_tier(tmp_path: Path) -> None:
     app = create_app(
         {
@@ -556,6 +647,7 @@ def test_index_renders_token_and_task_console(tmp_path: Path) -> None:
     assert "Exchange Token" in html
     assert "Get 1-Day Token" in html
     assert "content_image_count" in html
+    assert "mode_type" in html
     assert "/api/tasks" in html
     assert "/api/token" in html
     assert "Recent Tasks" in html

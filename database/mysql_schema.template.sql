@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS `article_tasks` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'Task ID returned by the API',
   `category` VARCHAR(16) NOT NULL COMMENT 'Article mode: seo or geo',
   `keyword` VARCHAR(255) NOT NULL COMMENT 'Single keyword for this task',
+  `mode_type` TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '1 keyword mode, 2 outline mode',
   `info` TEXT NOT NULL COMMENT 'Brand / product / business context',
   `task_context_json` LONGTEXT NOT NULL COMMENT 'Normalized task context as JSON',
   `language` VARCHAR(32) NOT NULL DEFAULT 'English' COMMENT 'Requested article language',

@@ -7,3 +7,4 @@ __pycache__/
 nohup.out
 server.pid
 .env.docker
+.DS_Store

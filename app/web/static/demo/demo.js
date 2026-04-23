@@ -414,6 +414,7 @@ document.addEventListener("DOMContentLoaded", () => {
       language: formData.get("language"),
       provider: formData.get("provider") || "openai",
       keyword: formData.get("keyword"),
+      mode_type: Number(formData.get("mode_type") || 1),
       info: formData.get("info"),
       force_refresh: formData.get("force_refresh") === "true",
       word_limit: Number(formData.get("word_limit") || 1200),
